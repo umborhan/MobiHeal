@@ -1,0 +1,17 @@
+digraph MobiHeal {
+  graph [rankdir=LR, bgcolor="white", pad=0.3, nodesep=0.38, ranksep=0.9, splines=ortho];
+  node [shape=box, style="rounded,filled", fillcolor="#e8f6f2", color="#a8d9cd", fontname="DejaVu Sans", fontsize=12, margin="0.20,0.14"];
+  edge [color="#5d9f95", arrowsize=0.72];
+  Browser [label="Responsive web UI\ncode/web"];
+  Server [label="HTTP API\nserver.py", fillcolor="#d9eee9"];
+  Service [label="Domain service\nservice.py"];
+  Sqlite [label="SQLite demo store\ndb.py", fillcolor="#fff2e5", color="#e9ceb2"];
+  Android [label="Android demo\nKotlin + Compose", fillcolor="#eae8f9", color="#cbc0ec"];
+  AndroidState [label="In-memory fixtures\n(no backend)", fillcolor="#eae8f9", color="#cbc0ec"];
+  Scheduler [label="Synthetic scheduler\nscheduler.py"];
+  Benchmark [label="Paired-seed results\nbenchmark.py", fillcolor="#f4f8fb"];
+  Browser -> Server -> Service -> Sqlite;
+  Android -> AndroidState [color="#877cc4"];
+  Scheduler -> Benchmark;
+  { rank=same; Browser; Android; Scheduler; }
+}
