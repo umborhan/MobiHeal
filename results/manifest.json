@@ -1,0 +1,14 @@
+{
+  "project": "MobiHeal",
+  "type": "synthetic scheduling simulation",
+  "version": 1,
+  "seeds": 20,
+  "first_seed": 100,
+  "cases_per_seed": 150,
+  "policies": [
+    "fifo",
+    "admin_priority",
+    "aging"
+  ],
+  "disclaimer": "No real patients, medical triage, or clinical outcomes."
+}

@@ -1,0 +1,4 @@
+policy,seeds,cases_per_seed,mean_wait_min,p95_wait_min,max_wait_min,admin_high_mean_wait_min
+fifo,20,150,495.62,951.1,993.75,489.31
+admin_priority,20,150,497.28,1020.65,1041.7,10.71
+aging,20,150,497.68,1019.65,1040.25,113.85
