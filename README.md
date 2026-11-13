@@ -84,11 +84,15 @@ The architecture separates **offline trusted authorization provisioning** from t
 For target identifier `rₖ`, validity window `w`, hidden vehicle counter `c`, and retry index `a ∈ {0, …, q−1}`, the vehicle and MSC derive:
 
 $$
-\begin{aligned}
-C_{k,w,c,a} &= \mathsf{enc}(r_k,w,c,a),\\
-A_a &= \mathrm{KMAC}_{S_i}(C_{k,w,c,a};256,d_A),\\
-P_a &= \mathrm{Trunc}_{128}\!\left(\mathrm{KMAC}_{S_i}(C_{k,w,c,a};256,d_P)\right).
-\end{aligned}
+C_{k,w,c,a} = \mathsf{enc}(r_k,w,c,a)
+$$
+
+$$
+A_a = \mathrm{KMAC}_{S_i}(C_{k,w,c,a};256,d_A)
+$$
+
+$$
+P_a = \mathrm{Trunc}_{128}\!\left(\mathrm{KMAC}_{S_i}(C_{k,w,c,a};256,d_P)\right)
 $$
 
 `Aₐ` is the authorization secret; `Pₐ` is the radio pseudonym. Different domain labels prevent these outputs from being used interchangeably. Because the target identifier is part of the derivation context, credentials disclosed at one RSU should not authenticate at a distinct honest RSU under the KMAC pseudorandomness assumption (**Proposition 1**).
@@ -104,23 +108,37 @@ At each epoch `e`, target `Rₖ` prepares a pool of `B` independently generated 
 For an authenticated offer, the vehicle encapsulates `(ct,Z) ← Enc(pⱼ)` and both endpoints compute transcript-bound contributions:
 
 $$
-\begin{aligned}
-h_2 &= H(d_2\|\mathsf{enc}(M_0,M_1,P_a,N_V,ct)),\\
-Y_A &= \mathrm{KMAC}_{A_a}(h_2;256,d_{\mathrm{mixA}}),\\
-Y_Z &= \mathrm{KMAC}_{Z}(h_2;256,d_{\mathrm{mixZ}}),\\
-K^* &= Y_A \oplus Y_Z.
-\end{aligned}
+h_2 = H(d_2\|\mathsf{enc}(M_0,M_1,P_a,N_V,ct))
+$$
+
+$$
+Y_A = \mathrm{KMAC}_{A_a}(h_2;256,d_{\mathrm{mixA}})
+$$
+
+$$
+Y_Z = \mathrm{KMAC}_{Z}(h_2;256,d_{\mathrm{mixZ}})
+$$
+
+$$
+K^* = Y_A \oplus Y_Z
 $$
 
 Here `H` is SHA3-384, `Z` is the KEM shared secret, `d` labels are distinct `MOBIHEAL-...` domain strings, and `enc` is an injective, length-delimited canonical serialization. Confirmation and application keys are derived separately:
 
 $$
-\begin{aligned}
-h &= H(d_h\|\mathsf{enc}(M_0,M_1,M_2)),\\
-K_v &= \mathrm{KMAC}_{K^*}(h_2;256,d_{\mathrm{cv}}),\\
-K_r &= \mathrm{KMAC}_{K^*}(h;256,d_{\mathrm{cr}}),\\
-K_{\mathrm{app}} &= \mathrm{KMAC}_{K^*}(h;256,d_{\mathrm{app}}).
-\end{aligned}
+h = H(d_h\|\mathsf{enc}(M_0,M_1,M_2))
+$$
+
+$$
+K_v = \mathrm{KMAC}_{K^*}(h_2;256,d_{\mathrm{cv}})
+$$
+
+$$
+K_r = \mathrm{KMAC}_{K^*}(h;256,d_{\mathrm{cr}})
+$$
+
+$$
+K_{\mathrm{app}} = \mathrm{KMAC}_{K^*}(h;256,d_{\mathrm{app}})
 $$
 
 The independent KEM contribution is intended to protect a retired session if the symmetric root is exposed **later**, but only after used KEM secrets and retired application-key copies have been erased. **Lemma 1** explains the independent-PRF XOR intuition; **Theorem 1** proves honest-run agreement under matching inputs. Neither alone is a complete computational reduction for active, concurrent authenticated key exchange.
@@ -177,10 +195,11 @@ The RSU identifies the `(Pₐ,w)` record and rejects unknown pseudonyms or inval
 After admission, the RSU chooses an unused index `j`, generates `Nᴿ`, and computes:
 
 $$
-\begin{aligned}
-h_1 &= H(d_1\|\mathsf{enc}(H(\mathsf{enc}(M_0)),e,j,N_R,p_j)),\\
-\beta_1 &= \mathrm{KMAC}_{A_a}(h_1;128,d_\beta).
-\end{aligned}
+h_1 = H(d_1\|\mathsf{enc}(H(\mathsf{enc}(M_0)),e,j,N_R,p_j))
+$$
+
+$$
+\beta_1 = \mathrm{KMAC}_{A_a}(h_1;128,d_\beta)
 $$
 
 It **atomically commits** the reservation, consumed attempt, request hash, exact `M₁`, and expiry *before transmitting the offer*. The vehicle checks `β₁` against its current `M₀` before authenticating the Merkle proof and encapsulating. A valid leaf from a **different** request is not sufficient.
@@ -190,10 +209,11 @@ It **atomically commits** the reservation, consumed attempt, request hash, exact
 The vehicle sends `ct`, a fresh `Nⱽ`, and:
 
 $$
-\begin{aligned}
-\alpha_2 &= \mathrm{KMAC}_{A_a}(h_2;256,d_{\mathrm{pre}}),\\
-\tau_V &= \mathrm{KMAC}_{K_v}(h_2\|\alpha_2;256,d_{\mathrm{fv}}).
-\end{aligned}
+\alpha_2 = \mathrm{KMAC}_{A_a}(h_2;256,d_{\mathrm{pre}})
+$$
+
+$$
+\tau_V = \mathrm{KMAC}_{K_v}(h_2\|\alpha_2;256,d_{\mathrm{fv}})
 $$
 
 The vehicle persists the exact outgoing `M₂` and protected pending state. At the RSU, `α₂` must be checked **before** invoking ML-KEM decapsulation; `τⱽ` is checked after recovering `Z` and deriving the same key schedule. Exclusive access prevents two concurrent copies of `M₂` from decapsulating an index twice.
