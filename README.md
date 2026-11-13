@@ -1,40 +1,42 @@
 # MobiHeal: One-Hop Compromise Recovery for Post-Quantum Vehicular Handover
 
-**Research documentation for target-isolated authentication, post-quantum session establishment, and failure-safe handover in the Internet of Vehicles (IoV).**
+**Research documentation and reproducibility resources for target-isolated authentication, post-quantum key establishment, transcript privacy, and crash-safe vehicular handover in the Internet of Vehicles (IoV).**
 
 > **Research manuscript:** *MobiHeal: One-Hop Compromise Recovery for Post-Quantum Vehicular Handover*  
-> **Authors:** Anam Nasir, Md. Borhan, Arif Raza, Xiang He, and Zhongjie Wang  
-> **Security design:** independent credentials for each target RSU, ML-KEM-768 key establishment, ML-DSA-65-authenticated ephemeral-key pools, and crash-consistent handover  
-> **Research artifacts:** manuscript source, bibliography, five manuscript figures (including the LaTeX system diagram), fourteen manuscript tables, PDF/PNG plots, and a separately supplied experimental notebook  
-> **Evidence status:** reported manuscript measurements and simulations are differentiated from formula-based estimates, notebook outputs, and proposed—not yet fully evaluated—protocol extensions.
+> **Authors:** Anam Nasir, Uddin Md. Borhan, Arif Raza, Xiang He, and Zhongjie Wang  
+> **Core construction:** target-specific KMAC256 credentials, ML-KEM-768 session entropy, ML-DSA-65-signed Merkle key pools, request-bound offers, and durable single-use state  
+> **Repository contents:** one consolidated experimental notebook, two architecture figures, four evaluation figures, this README, and an MIT license  
+> **Evidence rule:** manuscript-reported measurements, new notebook measurements, formal-model verdicts, simulations, and analytical byte counts are identified separately.
 
 ## Overview
 
-Vehicles frequently leave one roadside unit (RSU) and connect to another. An RSU that has been compromised can expose authentication records, session data, and recorded wireless exchanges, and these artifacts may outlive the vehicle's association with that RSU. Merely replacing the network attachment point does not necessarily eliminate the consequences of that exposure.
+Vehicle-to-infrastructure (V2I) communication involves frequent transitions between roadside units (RSUs). A compromised RSU may expose its authentication records, cached transcripts, application keys that have not been erased, and unused or un-erased ephemeral key material. Those disclosures can remain useful after a vehicle leaves the compromised RSU unless the next handover is designed to isolate authorization and derive a fresh session key.
 
-MobiHeal studies a specific recovery boundary: **can the first *completed* handshake with a separately provisioned, uncompromised target RSU produce an authenticated, fresh application key even when previously visited RSUs have been disclosed?** Its answer is a **conditional design objective**, not a universal guarantee. The new target must have an independent vehicle authenticator, an uncompromised ephemeral ML-KEM secret, and valid trust metadata; the vehicle/controller root must remain protected through the challenged session.
+**MobiHeal asks whether the first *qualifying completed* handover to an independently provisioned, uncompromised target RSU can recover vehicle authentication and application-key secrecy without a synchronous Mobility Security Controller (MSC) round trip.** The recovery condition is specific: the new target must have an unexposed authorization record and an unexposed ephemeral ML-KEM key, and the challenged vehicle/controller root must remain protected under the security experiment's freshness rules. A failed handover, a compromised new target, or a transition using exposed target secrets is **not** a healing point.
 
-Three engineering decisions support this objective:
+The design integrates three research contributions:
 
-1. **Isolate authorization by destination.** Each candidate RSU receives its own pseudonym/authenticator group over a protected controller channel. A former RSU never receives the group assigned to a different target.
-2. **Mix freshly established post-quantum secret material into the session key.** A target offers one of its independently generated ML-KEM-768 public keys from a signed Merkle pool. The vehicle authenticates both the pool and the specific offer before encapsulation.
-3. **Treat key use as irreversible state.** Verified requests lead to durable reservations; completed or abandoned keys cannot be placed back into the free pool after a retransmission, timeout, or restart.
+1. **Target-isolated mobility authentication.** The vehicle and MSC derive a different pseudonym/authenticator group for each target, window, counter, and allowed attempt. An old RSU's stolen state does not authorize the same vehicle at a separately provisioned target.
+2. **An exposure-aware post-quantum security model.** Independently generated ML-KEM-768 entropy is combined with target-specific authentication material. The manuscript separately scopes one-hop authentication recovery, application-key secrecy, retired-session secrecy, and matched-context transcript unlinkability.
+3. **Durable, authenticated four-message handover.** A signed Merkle pool authenticates one-time KEM offers, a request-bound `β₁` tag prevents stale-offer substitution, `α₀` and `α₂` gate expensive work, and persistent irreversible transitions protect retransmissions and restarts.
 
-The research distinguishes a **measured original four-message implementation** from a **revised protocol specification** that adds a request-bound `β₁` tag to the RSU offer and includes an MSC-assisted recovery exchange. These revisions need their own timing and end-to-end security evaluation; numerical performance claims below are identified by evidence type.
+The current paper evaluates **the request-bound `β₁` four-message implementation**, including key-index/reply-cache persistence. An additional configuration evaluates AES-GCM-wrapped application-session storage and pending MSC-report persistence. The repository notebook aims to reproduce the experimental *methods and trial counts*, but freshly executed timings and model verdicts must be reported as new results rather than substituted for the manuscript values.
 
 ### At a glance
 
-| Aspect | MobiHeal design | Important condition |
+| Aspect | Current MobiHeal manuscript | Scope or qualification |
 |---|---|---|
-| Recovery target | First qualifying honest-target completed handover (`d_heal = 1`) | Not a recovery claim for a compromised target or vehicle root |
-| New key contribution | Independently generated **ML-KEM-768** ephemeral secret | Matching secret/key erasure and AKE freshness required |
-| RSU key authentication | **ML-DSA-65** signed Merkle descriptor and per-index proof | Certificate, signature, expiry, epoch, and revocation must be checked |
-| Vehicle admission | Target-bound KMAC authenticator | Secret is distributed only to the selected target |
-| Fast exchange | Four messages, `M₀`–`M₃` | Prepositioning and descriptor validation happen beforehand |
-| Loss tolerance | Exact response caching and irreversible key states | Progress is not assured against indefinite network suppression |
-| Original local processing | **6.982 ms** reported mean | Excludes radio delay, queueing, provisioning, and slow-path traffic |
-| Original warm-cache payload (`B=1024`) | **3,048 bytes** | Excludes cached descriptor, link headers, and retransmission overhead |
-| Revised warm-cache payload (`B=1024`) | **3,064 bytes**, calculated | Adds 16-byte `β₁`; revised processing latency is **unmeasured** |
+| Healing distance | **One qualifying honest-target handover**, `d_heal ≤ 1` | Only after a completed, fresh session at an independently provisioned honest target |
+| Authentication records | Target-bound `(Pₐ, Aₐ)` derived with **KMAC256** | A compromised target's own authenticator is not protected against that target |
+| Post-quantum key establishment | **ML-KEM-768** independently generated one-time pairs | Unexposed KEM secret and appropriate secret erasure required |
+| RSU authentication | **ML-DSA-65** certified, signed Merkle descriptor and Merkle proof | Descriptor, certificate, epoch, expiry, and revocation checks are prerequisites |
+| Fast handover | Four messages, **`M₀`–`M₃`** | Target provisioning and descriptor verification happen before the fast path |
+| Offer authentication | Request-bound **128-bit `β₁`** | Current `M₁` format includes the tag |
+| Mean local processing (`B=1024`) | **13.360 ms** | Manuscript measurement, not radio-inclusive delay |
+| Mean vehicle / RSU processing | **8.336 / 5.024 ms** | Manuscript measurement |
+| Warm-cache V2I payload (`B=1024`) | **3,064 bytes** | Four protocol messages; excludes link/PHY headers, descriptor acquisition, and retransmissions |
+| Offer and completion commits | **75.3% of RSU processing** | Reported persistence-related processing share |
+| Modeled completion at 20% packet loss | **96.665%** | Independent-loss Monte Carlo, not a real-radio guarantee |
 
 ---
 
@@ -58,632 +60,672 @@ The research distinguishes a **measured original four-message implementation** f
 
 ### Participants and trust boundaries
 
-MobiHeal separates the wireless authentication exchange from the distribution of private authorization records:
+The architecture separates **offline trusted authorization provisioning** from the **online adversarial wireless exchange**.
 
-| Participant | Responsibility | Information that matters to security |
+| Participant | Responsibility | Security boundary |
 |---|---|---|
-| Vehicle `Vᵢ` | Maintains a protected root `Sᵢ`, local counter, and pending handover state; authenticates offers and confirms keys | Root disclosure before a challenge invalidates the intended recovery and privacy experiments |
-| Previous RSU `Rⱼ` | Former serving infrastructure node; may be compromised | Attacker may learn its complete local state but should not thereby learn the next target's authenticator |
-| Target RSU `Rₖ` | Verifies target-bound credentials and offers independently generated ephemeral ML-KEM keys | Must remain honest for the challenged exchange and protect its decapsulation secret until erasure |
-| Mobility Security Controller (MSC) | Derives/provisions target-specific records and reconciles unresolved counters | Trusted during fast-path preparation and controller-assisted recovery |
-| Trust authority (TA) | Anchors the RSU signing-key certification chain | Certificate validation, revocation, and anti-rollback are prerequisites |
+| Vehicle `Vᵢ` | Holds a protected 256-bit root `Sᵢ`, monotone counter `cᵢ`, and protected pending state; authenticates offers and confirmations | The vehicle root must not be disclosed during the basic healing/privacy challenge |
+| Previously visited RSU `Rⱼ` | Former serving node; may be completely compromised | Its signing key, local group records, cached transcripts, and un-erased material may be disclosed |
+| Target RSU `Rₖ` | Holds only its independently provisioned authorization records; allocates one-time ML-KEM public keys | Honest target records, the challenge decapsulation key, and applicable application-key copies must be protected |
+| Mobility Security Controller (MSC) | Maintains a matching vehicle root, counters, private identity mappings, target provisioning, and completion reconciliation | Trusted provisioning channel; root/controller exposure is restricted by the security experiment |
+| Trust Authority (TA) | Certifies each target RSU's ML-DSA-65 verification key | Certificate-chain and revocation checking are necessary for authenticating the descriptor |
+| Wireless adversary | Records, replays, drops, schedules, and modifies radio packets | Cryptographic secrecy and authentication are claimed only under the defined exposure/freshness conditions |
 
-**Figure 1 — Fast-path trust boundary (source: TikZ drawing in `main.tex`, `fig:architecture`).** The figure puts the vehicle and target RSU on the online `M₀`–`M₃` channel, with a provisioning arrow from the MSC to the target. The already compromised RSU appears outside this trust boundary: its disclosure reveals historical data, not the independently provisioned verifier secret at the new target. The figure illustrates which party holds which authority; **it does not itself establish confidentiality of the infrastructure channel or quantify network latency.**
+![Figure 1: MobiHeal architecture, security objectives, and four-message handover](figs/framework-mobiheal-1.png)
 
-```mermaid
-graph LR
-  TA[Trust authority: RSU certificates] --> RSU[Target RSU Rk]
-  MSC[MSC: target-specific records] -->|Authenticated confidential provisioning| RSU
-  MSC -->|Protected root / counter relationship| V[Vehicle Vi]
-  OLD[Past compromised RSU Rj] -.->|Only old credentials disclosed| ADV[Adversary]
-  V <-->|M0, M1, M2, M3 over adversarial radio| RSU
-  RSU --> STATE[Reserved / spent / abandoned indices]
-  RSU -.->|Asynchronous completion report| MSC
-```
+**Figure 1 (manuscript p. 4)** combines target-specific authorization, the joint security model, and the `M₀`–`M₃` fast path. It identifies both authenticated admission gates and the durable commits that occur before externally visible messages. It is a protocol diagram, not an empirical latency result.
 
-*The Mermaid diagram above is an original README schematic explaining the manuscript's trust relationships; it is not a reproduced experimental result.*
+![Figure 2: Compromised past RSU and independently provisioned honest target](figs/mobiheal-fast-path-1.png)
 
-### N1 — Target-isolated mobility credentials
+**Figure 2 (manuscript p. 5)** illustrates the target-isolation trust boundary. The old RSU contributes *only old state* to the attacker's knowledge, whereas the MSC provisions the new target separately. The picture does not establish security if the new target itself is compromised.
 
-For each candidate target identifier `rₖ`, authorization window `w`, private counter `c`, and allowable retry index `a`, the vehicle and MSC calculate distinct values from the protected vehicle root `Sᵢ`:
+### N1 — One-hop mobility healing with target-specific credentials
+
+For target identifier `rₖ`, validity window `w`, hidden vehicle counter `c`, and retry index `a ∈ {0, …, q−1}`, the vehicle and MSC derive:
 
 $$
-C_{k,w,c,a}=\operatorname{enc}(r_k,w,c,a)
+\begin{aligned}
+C_{k,w,c,a} &= \operatorname{enc}(r_k,w,c,a),\\
+A_a &= \operatorname{KMAC}_{S_i}(C_{k,w,c,a};256,d_A),\\
+P_a &= \operatorname{Trunc}_{128}\!\left(\operatorname{KMAC}_{S_i}(C_{k,w,c,a};256,d_P)\right).
+\end{aligned}
 $$
 
-$$
-A_a=\operatorname{KMAC}_{S_i}(C_{k,w,c,a};256,d_A),\qquad
-P_a=\operatorname{Trunc}_{128}\!\left(\operatorname{KMAC}_{S_i}(C_{k,w,c,a};256,d_P)\right).
-$$
+`Aₐ` is the authorization secret; `Pₐ` is the radio pseudonym. Different domain labels prevent these outputs from being used interchangeably. Because the target identifier is part of the derivation context, credentials disclosed at one RSU should not authenticate at a distinct honest RSU under the KMAC pseudorandomness assumption (**Proposition 1**).
 
-`Aₐ` authenticates requests, while `Pₐ` acts as the on-air pseudonym. The KMAC labels differ, so the two values play separate roles; the target identifier in the encoded input prevents an old target's derived output from being a valid new-target credential under the assumed pseudorandom-function security.
+The MSC privately stores an unpredictable 128-bit handle `g → (i,c,k,w)` and provisions `Qₖ,g = (g,w,{(Pₐ,Aₐ)},u)` only to the intended target. RSUs do not receive a readable vehicle counter. Exactly one attempt in a record group can have an outstanding offer; failed attempts must durably retire their allocated indices, and completion invalidates the remaining alternatives.
 
-The controller generates an unpredictable record handle `g` and privately maps it to the corresponding vehicle, counter, target, and window. The target receives its bounded `(Pₐ, Aₐ)` group and the handle; it does **not** receive the readable vehicle counter or a reusable credential for other RSUs. A completed handover invalidates the rest of the group's alternatives. Repeated transmission of an *identical packet* remains linkable at packet level, which is not inconsistent with the more narrowly defined cryptographic privacy experiment.
+**Healing distance** counts qualifying honest-target completions after earlier-RSU compromise. MobiHeal's target is `d_heal ≤ 1` for the first eligible completion—not one radio transmission, one cryptographic step, or a guarantee of immediate recovery under packet loss.
 
-### N2 — Post-quantum key establishment and privacy model
+### N2 — Joint security model and post-quantum entropy
 
-For epoch `e`, the target prepares `B` independently generated ML-KEM-768 key pairs `(pⱼ, sⱼ)`. A Merkle leaf binds each public key to its target, epoch, and index. One ML-DSA-65 signature certifies the pool descriptor, including the Merkle root. During the fast exchange the RSU transmits the selected public key and its authentication path, **not a fresh full signature**.
+At each epoch `e`, target `Rₖ` prepares a pool of `B` independently generated ML-KEM-768 key pairs `(pⱼ,sⱼ)`. Each Merkle leaf commits to `(rₖ,e,j,pⱼ)`. The target signs **one descriptor** containing the Merkle root, epoch, expiry, pool size, and its certification material. A handover transfers the selected public key and proof `πⱼ`, **without a new full ML-DSA signature for every offer**.
 
-The vehicle first validates the certified descriptor and the authenticated current offer. Once it encapsulates to `pⱼ`, both peers derive a post-quantum contribution `Z`. The key schedule mixes a PRF output derived from `Aₐ` with a PRF output derived from `Z` using disjoint domain labels and an XOR combiner:
+For an authenticated offer, the vehicle encapsulates `(ct,Z) ← Enc(pⱼ)` and both endpoints compute transcript-bound contributions:
 
 $$
-Y_A=\operatorname{KMAC}_{A_a}(h_2;256,d_{\mathrm{mixA}}),\qquad
-Y_Z=\operatorname{KMAC}_{Z}(h_2;256,d_{\mathrm{mixZ}})
+\begin{aligned}
+h_2 &= H(d_2\|\operatorname{enc}(M_0,M_1,P_a,N_V,ct)),\\
+Y_A &= \operatorname{KMAC}_{A_a}(h_2;256,d_{\mathrm{mixA}}),\\
+Y_Z &= \operatorname{KMAC}_{Z}(h_2;256,d_{\mathrm{mixZ}}),\\
+K^* &= Y_A \oplus Y_Z.
+\end{aligned}
 $$
 
+Here `H` is SHA3-384, `Z` is the KEM shared secret, `d` labels are distinct `MOBIHEAL-...` domain strings, and `enc` is an injective, length-delimited canonical serialization. Confirmation and application keys are derived separately:
+
 $$
-K^*=Y_A\oplus Y_Z,\qquad
-K_{\mathrm{app}}=\operatorname{KMAC}_{K^*}(h;256,d_{\mathrm{app}}).
+\begin{aligned}
+h &= H(d_h\|\operatorname{enc}(M_0,M_1,M_2)),\\
+K_v &= \operatorname{KMAC}_{K^*}(h_2;256,d_{\mathrm{cv}}),\\
+K_r &= \operatorname{KMAC}_{K^*}(h;256,d_{\mathrm{cr}}),\\
+K_{\mathrm{app}} &= \operatorname{KMAC}_{K^*}(h;256,d_{\mathrm{app}}).
+\end{aligned}
 $$
 
-`h₂` and `h` are transcript hashes constructed from canonically encoded messages. Confirmation keys are generated under **different** labels from the application key so a public confirmation tag is not simply a public guess-check function for the protected application key.
+The independent KEM contribution is intended to protect a retired session if the symmetric root is exposed **later**, but only after used KEM secrets and retired application-key copies have been erased. **Lemma 1** explains the independent-PRF XOR intuition; **Theorem 1** proves honest-run agreement under matching inputs. Neither alone is a complete computational reduction for active, concurrent authenticated key exchange.
 
-**Interpretation:** an attacker who has old RSU records cannot automatically reproduce `Aₐ` for an unrelated target. Later exposure of the vehicle's root also does not directly reveal an already retired KEM secret **if the relevant ephemeral private key and the completed application-key copies were effectively erased**. Turning this construction into a full adversarial, concurrent-session key-indistinguishability proof requires more than primitive security alone.
+Transcript unlinkability is evaluated with *matched public context*: target, epoch, window, packet schedule, and timing class are fixed. The challenge roots, MSC mappings, and target records remain hidden. This does **not** hide road location, radio fingerprints, retransmission duplicates, or externally visible application identifiers.
 
-### N3 — Fail-closed state transitions
+### N3 — Durable single-use post-quantum state
 
-The target's ephemeral-key index progresses through the following states:
+The target persists every ephemeral key's state in a one-way lifecycle:
 
 ```text
-free --(verified admission; durable offer)--> reserved
-reserved --(verified completion; durable commit)--> spent
-reserved --(expiry / authenticated failure)--> abandoned
+KEM key index j
 
-NEVER: spent -> free
-NEVER: abandoned -> free
-NEVER: already offered index -> a distinct handover
+free --(valid M0; atomic reservation + cached M1)--> reserved
+reserved --(verified M2; durable completion + erase sj)--> spent
+reserved --(timeout / verified terminal failure)--> abandoned
+
+Forbidden: spent -> free
+Forbidden: abandoned -> free
+Forbidden: an emitted index -> a distinct new handover
 ```
 
-The vehicle's one-time target record likewise progresses from `unused` to `offered`, then either `completed` or `expired`. A duplicated `M₀` or `M₂` can retrieve the original cached response but cannot create another key allocation or re-run a completed decapsulation. These are **conditional invariants**: atomic commit ordering, non-rollback storage, and deletion of ephemeral private keys must hold in the actual deployment, not just in an in-memory simulation.
+The authorization group is also monotone (`unused → offered → completed/expired`), and consumed attempt indices are retained. A duplicated packet retrieves its **exact cached** reply instead of allocating a new key or repeating decapsulation. Theorem 2 states the single-use invariant subject to **atomic commits, crash recovery without storage rollback, and effective private-key erasure**. A deliberately rollback-enabled model violates the invariant, as expected.
 
 ---
 
 ## Protocol walkthrough
 
-### The four-message fast path
+### Four-message authenticated fast path (Table V)
 
-| Message | Sender → receiver | Purpose and fields | Receiver gate |
+| Message | Direction | Main fields | Required receiver check |
 |---|---|---|---|
-| **`M₀`** | Vehicle → RSU | Present `(Pₐ, w, N₀, α₀)` as a target-bound admission attempt | Verify `α₀` before reserving a pool slot |
-| **`M₁`** | RSU → vehicle | Offer `(rₖ, e, w, j, Nᴿ, pⱼ, πⱼ, β₁)` | Match `β₁` to the active `M₀`; validate descriptor and ordered Merkle proof |
-| **`M₂`** | Vehicle → RSU | Send `(Pₐ, Nⱽ, ct, α₂, τⱽ)` after encapsulation and key derivation | Check active offer and `α₂` before decapsulation; verify `τⱽ` afterward |
-| **`M₃`** | RSU → vehicle | Deliver `(sid, τᴿ)` after committing completion | Verify final authenticator; only then accept key and advance counter |
+| **`M₀`** | Vehicle → target RSU | `Pₐ, w, N₀, α₀` | Authenticate `α₀` **before reserving** a KEM index |
+| **`M₁`** | Target RSU → vehicle | `rₖ, e, w, j, Nᴿ, pⱼ, πⱼ, β₁` | Check request-bound `β₁`, then validate signed pool context and Merkle proof |
+| **`M₂`** | Vehicle → target RSU | `Pₐ, Nⱽ, ct, α₂, τⱽ` | Validate active offer and `α₂` **before decapsulation**, then verify `τⱽ` |
+| **`M₃`** | Target RSU → vehicle | `sid, τᴿ` | Verify `τᴿ` **before application-key acceptance and counter advancement** |
 
-#### Step 1 — Preparation (not counted in warm-cache online timing)
+#### Step 1 — Offline provisioning and descriptor validation
 
-The MSC prepositions the right verifier at each possible target over its private infrastructure channel. Separately, the RSU has already generated the ephemeral key pool, signed its root descriptor, and made the descriptor discoverable. The vehicle checks authenticity, expiration, revocation, and epoch monotonicity **before** trusting a proof from that pool.
+The MSC provisions the target-specific `Qₖ,g` record on an authenticated confidential infrastructure connection. The target builds its independent ML-KEM pool and ML-DSA-65-signed Merkle descriptor `Dₖ,e`. The vehicle verifies the target's certificate chain, revocation state, expiry, and monotone epoch prior to the online fast path. These operations are not charged to the paper's warm-cache local-handshake measurement.
 
-#### Step 2 — Initial admission, `M₀`
+#### Step 2 — `M₀`: authenticated admission
 
-The vehicle chooses a fresh request nonce and derives `α₀` from the target-specific authenticator and a hash of the request context. An unknown pseudonym or incorrect tag is rejected without touching the one-time key pool. This ordering matters under unsolicited traffic because a key pool is finite and individual ephemeral keys cannot safely be recycled once offered.
+The vehicle selects a fresh 128-bit nonce `N₀` and computes:
 
-#### Step 3 — Authenticated ephemeral offer, `M₁`
+$$
+\alpha_0=\operatorname{KMAC}_{A_a}\!\left(H(d_0\|\operatorname{enc}(r_k,w,P_a,N_0));256,d_{\mathrm{adm}}\right).
+$$
 
-After successful admission, the RSU chooses an unused index, records the exact request/offer and reservation in durable storage, and emits its signed-pool Merkle proof. The revision adds **`β₁`**, a 128-bit KMAC tag that commits the offer to the active request context. Verifying only a valid Merkle leaf is not enough: a previously legitimate leaf could otherwise be substituted from an unrelated earlier offer.
+The RSU identifies the `(Pₐ,w)` record and rejects unknown pseudonyms or invalid `α₀` without touching the pool. When capacity is unavailable, an **authenticated BUSY** reply uses the target credential; an attacker must not be able to forge a BUSY notice that suppresses a valid offer.
 
-#### Step 4 — Post-quantum encapsulation, `M₂`
+#### Step 3 — `M₁`: request-bound, Merkle-authenticated offer
 
-The vehicle rejects an offer whose tag or Merkle proof is inconsistent, then encapsulates to the authenticated ML-KEM public key. It derives independent application/confirmation secrets, sends a pre-decapsulation authenticator `α₂`, and proves possession of the combined secret using `τⱽ`. The RSU must verify `α₂` **before** invoking the costlier KEM decapsulation.
+After admission, the RSU chooses an unused index `j`, generates `Nᴿ`, and computes:
 
-#### Step 5 — Durable finish, `M₃`
+$$
+\begin{aligned}
+h_1 &= H(d_1\|\operatorname{enc}(H(\operatorname{enc}(M_0)),e,j,N_R,p_j)),\\
+\beta_1 &= \operatorname{KMAC}_{A_a}(h_1;128,d_\beta).
+\end{aligned}
+$$
 
-Following a valid `M₂`, the RSU commits the record to `completed`, marks the index `spent`, deletes the active decapsulation secret, retains a bounded response cache for exact retransmissions, and sends `M₃`. The vehicle only advances its hidden counter after authenticating the received confirmation. This avoids treating a sent—but unacknowledged—message as a completed handover.
+It **atomically commits** the reservation, consumed attempt, request hash, exact `M₁`, and expiry *before transmitting the offer*. The vehicle checks `β₁` against its current `M₀` before authenticating the Merkle proof and encapsulating. A valid leaf from a **different** request is not sufficient.
 
-### Lost-packet and restart behavior
+#### Step 4 — `M₂`: post-quantum encapsulation and confirmation
 
-| Condition | Required response | Why it matters |
+The vehicle sends `ct`, a fresh `Nⱽ`, and:
+
+$$
+\begin{aligned}
+\alpha_2 &= \operatorname{KMAC}_{A_a}(h_2;256,d_{\mathrm{pre}}),\\
+\tau_V &= \operatorname{KMAC}_{K_v}(h_2\|\alpha_2;256,d_{\mathrm{fv}}).
+\end{aligned}
+$$
+
+The vehicle persists the exact outgoing `M₂` and protected pending state. At the RSU, `α₂` must be checked **before** invoking ML-KEM decapsulation; `τⱽ` is checked after recovering `Z` and deriving the same key schedule. Exclusive access prevents two concurrent copies of `M₂` from decapsulating an index twice.
+
+#### Step 5 — `M₃`: durable completion and vehicle acceptance
+
+The peers derive `sid = H(d_s || enc(rₖ,e,w,j,Pₐ,h))`. The RSU prepares `τᴿ = KMACₖᵣ(h || sid;256,d_fr)` and stores the spent index, protected active application session, exact cached `M₃`, and queued MSC report handle `g` before externally visible completion. It erases the offered KEM private secret before sending `M₃`.
+
+The vehicle verifies `τᴿ`, atomically accepts `K_app`, and advances its private counter **exactly once**. Duplicate `M₂` recovers cached `M₃` without new decapsulation; duplicate `M₃` does not advance the counter again. Subsequent retirement must erase application keys and recoverable KEM material, including protected copies where applicable.
+
+### Loss, replay, crash, and controller recovery (Table VI)
+
+| Event | Allowed response | Why it matters |
 |---|---|---|
-| `M₀` unknown or incorrectly authenticated | Reject without key reservation | Unauthenticated traffic must not consume scarce indices |
-| Repeated exact `M₀` | Return the previously committed `M₁` | Avoid changing the offer on radio retry |
-| Stale, altered, or unverifiable `M₁` | Reject; do not encapsulate | Prevent an unrelated signed key from being treated as the current offer |
-| Invalid `α₂` | Reject before decapsulation | Avoid avoidable KEM CPU expense |
-| Repeated exact `M₂` after completion | Return cached `M₃` | Do not reuse or re-open a spent KEM key |
-| Expired offer or restart | Reload committed state; abandon unresolved reserved indices where required | Keys exposed in an offer must not be advertised again |
-| Unresolved end-to-end completion | Freeze counter and start authenticated MSC recovery | Avoid simultaneous counter divergence between vehicle and controller |
+| Unknown `Pₐ` / invalid `α₀` | Reject before any key reservation | Avoid unauthorized pool consumption |
+| Invalid `α₂` | Reject before ML-KEM decapsulation | Avoid expensive unauthorized work |
+| Authenticating `M₁` fails | Reject stale `β₁` or invalid Merkle offer | Prevent substitution of an old or unrelated offer |
+| Pool unavailable | Return authenticated BUSY | Avoid forged back-pressure |
+| Exact duplicate `M₀` | Return previously committed `M₁` | Do not allocate a second index |
+| Exact duplicate `M₂` | Return previously committed `M₃` | Do not decapsulate a spent key |
+| Timeout or RSU restart | Restore state, abandon unresolved offered indices | No offered index returns to `free` |
+| Unresolved vehicle completion | Freeze counter; use authenticated `B₀`–`B₃` recovery | Avoid two incompatible acceptances under one counter |
+| Delayed MSC report | Deliver / deduplicate using opaque `g` | Make completion reporting idempotent |
 
-### Controller-assisted reconciliation (`B₀`–`B₃`)
+#### Authenticated MSC-assisted slow path: `B₀`–`B₃`
 
-If bounded retries cannot determine whether `M₃` was accepted, the vehicle uses a **separate authenticated controller path**, not another attempt with the same unresolved fast-path counter. The manuscript specifies a challenge/encapsulation exchange with the MSC, reconciliation of outstanding completion receipts, retirement of stale target records, and a protected counter update with newly prepared handles. This path depends on a reachable, uncompromised MSC and eventually cleared offers. **No independent latency or availability measurements for the complete slow path are supplied.**
+The manuscript specifies a separate controller recovery mechanism. The vehicle sends a root-authenticated challenge `B₀`; the MSC responds with `B₁` containing a fresh certified ML-KEM public key and challenge; the vehicle encapsulates and returns protected counter/pending-session information in `B₂`; the controller reconciles receipts, closes prior credentials, and returns protected counter/handle updates in `B₃`. Reconciliation requires a reachable, honest MSC and invalidation or expiry of outstanding old-counter credentials.
+
+**Implementation boundary:** the repository notebook models an **abstract** counter-reconciliation action and tests a **local** idempotent MSC report receiver. It does **not** provide or benchmark a complete networked `B₀`–`B₃` stack. The four-message fast path is the principal implemented object.
 
 ---
 
 ## Security experiments and assumptions
 
-The research is about *how a security claim is scoped*, not only whether two honest parties can produce the same key.
+The paper's formal objectives are stated for an adversary that controls the wireless channel and may compromise **previously visited** RSUs. The evidence must be read alongside the exposure rules in **Tables II and III**.
 
-| Experiment | Attacker capabilities permitted | Exclusions needed for the stated claim | What a positive result would mean |
+| Security objective | Permitted exposure / experiment | Required boundary | Available evidence |
 |---|---|---|---|
-| One-hop post-compromise healing (OPMH) | Historical RSU corruption and active radio-message control | Challenged target/credential and challenge ephemeral secret must remain unexposed; root/MSC uncompromised through completion | Past RSU state does not suffice to impersonate the vehicle or distinguish the new accepted application key |
-| Retired-session secrecy | Later vehicle-root/MSC information disclosure | Previously completed application keys and ephemeral decapsulation secret must have been erased | Later controller disclosure alone does not reconstruct an appropriately retired key |
-| Matched-context transcript privacy | Exposure of past RSUs, active packet scheduling | Candidate roots, new target mapping, and challenge-distinguishing disclosures withheld | Cryptographic transcripts from eligible vehicles remain hard to link after public context is matched |
-| Single-use index safety | Duplicate messages, timeouts, process restart | Atomic durable commits, rollback resistance, effective deletion | An index already offered does not become a fresh offer for another session |
+| One-hop post-compromise key and authentication recovery | Past-RSU records, signing keys, cached messages, and active radio manipulation | First eligible *honest* target; fresh target credential and KEM secret; uncompromised root/MSC | Proposition 1, chronological Table VII, symbolic correspondences |
+| Application-key secrecy | Network adversary, transcript observation | Challenge application key and active KEM secret unrevealed | ProVerif payload non-derivability in the specified model |
+| Retired-session secrecy | Later root/MSC and signing-key exposure | Used KEM secrets and retired application-key copies are erased | Conditional Proposition 2; no full computational reduction |
+| Matched-context transcript privacy | Historical RSU compromise with matched public handover context | Challenge roots, new target mappings, and external identity oracles hidden | **Single-challenge** ProVerif equivalence; multi-challenge remains unestablished |
+| Crash-safe single-use indices | Duplication, timeout, process restart | Atomic durable updates and no storage rollback | Theorem 2, Z3 bounded state machine, Table IX tests |
 
-**Outside scope:** physical tracking, radio fingerprints, deliberate jamming, compromise of the new target during the challenged session, pre-challenge MSC/root compromise, or unbounded network outage. Also, an adversary learning a key still resident at an endpoint cannot be expected to fail a game that tests that very key.
+### Formal verification boundaries (Table VIII)
 
-An **honest-run agreement statement** and a **durable-state invariant** are provided in the manuscript under their assumptions. Functional self-tests are valuable consistency checks, but they cannot replace a complete computational reduction for active AKE or an independently verified transcript-privacy equivalence model.
+**ProVerif 2.05** uses symbolic abstractions of cryptographic operations: a positive query verdict is meaningful *for that encoded model*, not a computational ML-KEM/ML-DSA security proof. **Z3** explores bounded state transitions under assumed authenticated guards and atomic storage; it does not establish hardware secure deletion. The paper reports:
+
+- **PV1–PV2:** two transcript-bound injective authentication correspondences — `true` in the explicit-transcript model.
+- **PV3:** non-derivability of an application challenge payload — `true` (not full key indistinguishability).
+- **PV4:** observational equivalence for **one** matched-context transcript challenge — `true`.
+- **PV5:** target-credential exposure negative control — authentication and payload-secrecy queries `false`, as intended.
+- **PV6–PV7:** same-root chronological two-handover authentication/secrecy queries — `true` in the modeled executions.
+- **PV8:** identity-swap and multiple-challenge linkage variants — **no verdict**; do not label them proven.
+- **Z1–Z7:** seven bounded safety-violation searches — `unsat`.
+- **Z8:** six valid completion/retry/crash/reconciliation patterns — `sat` (reachable).
+- **Z9:** rollback-fault negative control — `sat` with a violating trace.
+
+**Unestablished properties:** a general computational active-AKE key-secrecy reduction, computational retired-key indistinguishability after late root exposure, and multi-challenge cryptographic unlinkability. The manuscript explicitly distinguishes these from the positive model checks.
 
 ---
 
 ## Repository structure and code tour
 
-The tree documents the **research-manuscript repository**, not the unrelated health-services demo that has also circulated under the name MobiHeal.
+The supplied ZIP contains the following files. Paths below are **actual repository paths**, not recommended files that have not yet been added:
 
 ```text
-MobiHeal-research-main/
-├── README.md                              # This in-depth, original repository guide
-├── main.tex                               # Current manuscript and embedded Figure 1 (TikZ)
-├── references.bib                         # Research references and standard specifications
-├── graphs/
-│   ├── fig_handover_stage_latency.pdf     # Fig. 2 source
-│   ├── fig_handover_stage_latency.png     # GitHub preview
-│   ├── fig_loss_success_rate.pdf          # Fig. 3 source
-│   ├── fig_loss_success_rate.png          # GitHub preview
-│   ├── fig_loss_p95_latency.pdf           # Fig. 4 source
-│   ├── fig_loss_p95_latency.png           # GitHub preview
-│   ├── fig_message_size_breakdown.pdf     # Fig. 5 source
-│   └── fig_message_size_breakdown.png     # GitHub preview
-├── notebooks/
-│   └── MobiHeal_Paper_Final.ipynb         # Separately supplied experimental companion notebook
-└── backup/
-    ├── main.tex / new.tex                # Older manuscript versions
-    ├── references.bib                     # Historical reference list
-    ├── graphs/                            # Older/unreferenced experimental graphics
-    ├── model/                             # Archived design images (not current Fig. 1)
-    └── zt_ptba_tifs_results/              # Different historical research assets
+MobiHeal-main/
+├── README.md
+├── LICENSE
+├── code/
+│   ├── MobiHeal.ipynb
+│   └── a.txt                          # Placeholder
+├── figs/
+│   ├── framework-mobiheal-1.png      # Manuscript Figure 1
+│   ├── mobiheal-fast-path-1.png      # Manuscript Figure 2
+│   └── a.txt                          # Placeholder
+└── graphs/
+    ├── fig_local_processing_stages-1.png           # Manuscript Figure 3
+    ├── fig_local_processing_totals-1.png           # Manuscript Figure 4
+    ├── fig_loss_p95_latency-1.png                  # Manuscript Figure 5
+    ├── fig_message_size_revised_specification-1.png # Manuscript Figure 6
+    └── a.txt                                       # Placeholder
 ```
 
-### Manuscript and bibliography
+### `code/MobiHeal.ipynb`: consolidated research notebook
 
-`main.tex` is the source of record for the five figures and fourteen numbered tables described in this README. It defines the threat model, credential derivation, handover messages, cryptographic assumptions, local benchmarks, packet-loss simulation setup, and open proof obligations. `references.bib` provides the manuscript's citations; it should be updated alongside any new related-work claim.
+The [57-cell notebook](code/MobiHeal.ipynb) is self-contained at the **notebook input** level. Running its cells writes Python research modules and `.pv` verification models to the active working directory, then generates a results folder and archive. It covers:
 
-### Experimental notebook
+| Notebook section | Manuscript evidence / task |
+|---|---|
+| §0–2 | Profiles, dependency checking, canonical serialization, KMAC/SHA3, Merkle pools, ML-KEM/ML-DSA adapters, four-message core |
+| §3 | **Table VII** same-root chronological old-RSU compromise and first-target recovery |
+| §4 | **Table IX** duplicate-reply and process-restart functional checks |
+| §5 | **Figures 3–4** live local stage and combined processing |
+| §6 | **Figure 6** actual serialized message bytes for `B = 64, 256, 1024, 4096` |
+| §7 | **Table XII** offline pool generation and primitive timing |
+| §8 | Admission throughput, concurrency, and **Figure 5** independent packet-loss Monte Carlo |
+| §9 | **Table X** AES-GCM-wrapped application-session and pending-report persistence research implementation |
+| §10–11 | Z3 state machine and eight embedded ProVerif models; actual checker logs when tools are available |
+| §12 | **Table XI** six component-removal cases and two additional exploratory variants |
+| §13 | Regenerated **Figures 3–6** based on *current-run* observations |
+| §14 | Restricted empirical post-compromise challenge tests (diagnostics, **not** a cryptographic proof) |
+| §15–16 | Paper-vs-run reference table, claim/evidence ledger, version provenance, SHA-256 manifest, ZIP export |
 
-`notebooks/MobiHeal_Paper_Final.ipynb` was supplied separately from the original manuscript archive and is included as a **companion artifact**, not retroactively claimed to be the source of the published-in-manuscript values. It contains:
+**Important distinction:** some notebook sections are separate research implementations or model approximations. In particular, the application-session persistence implementation, abstract controller counter transition, and symbolic KEM/Merkle abstractions should not be described as fully deployed protocol components or as verification of external cryptographic libraries.
 
-- KMAC/SHA3 derivation checks, canonical encoding, Merkle authentication, and post-quantum backend adapters;
-- a SQLite/WAL reference state machine, retransmission handling, and functional self-tests;
-- local cryptographic and handover timing, pool accounting, admission-gate and concurrency experiments;
-- independent-loss/delay/mobility simulation and failure-boundary diagnostics;
-- generation of raw/summary CSVs, figures, environment metadata, checksums, and a `results.zip` bundle;
-- disclosure of readiness limitations (including non-demonstrated physical secure erasure and unavailable Tamarin proofs).
+### Figures and repository provenance
 
-The notebook contains **saved outputs from a previous execution**; saving an output is not the same as independently rerunning that result in this repository. The notebook explicitly documents a recovery-metadata refinement: the reference implementation retains the **exact public `M₀`** as well as its hash so an `M₂` retry can be processed after restart. This is an implementation-alignment note to be reconciled with the manuscript rather than silently presented as an unchanged paper protocol.
+The six PNGs are supplied **manuscript figure assets**, not plots recomputed merely by viewing the repository. `figs/` contains the architecture/trust figures; `graphs/` contains the four evaluation plots. An executed notebook writes its **new** figures into `MobiHeal_Complete_Results/figures/` and should preserve the originals for side-by-side comparison.
 
-### Historical assets and provenance
+**Not included in this ZIP:** `main.tex`, `references.bib`, the compiled manuscript PDF, a dedicated V2X radio testbed, a production certificate-validation service, or a complete networked MSC recovery service. Do not refer to these as repository paths until they are actually committed. The separately supplied 13-page manuscript is the source used to align the numbered figures and tables in this README.
 
-Root `graphs/` plots are the current manuscript figures. `backup/` may contain older versions, separate-topic data, or figures that do **not** appear in the current paper. Their presence is not evidence that their numbers are valid for the present experimental configuration. In particular, the archived diagram under `backup/model/` is not automatically the current RSU/MSC architecture.
-
-**What is not provided as a stand-alone artifact:** a production V2X deployment stack, a documented hardware testbed dataset, a self-contained formal Tamarin/ProVerif proof, or verified implementation measurements for the revised offer and MSC slow path. The notebook should be evaluated as its own reproducibility artifact rather than assuming these missing components exist.
+**License:** [`LICENSE`](LICENSE) is the MIT License and includes the copyright notice for Md. Borhan Uddin (2026). See that file for the repository's permission and attribution terms; the licensing of third-party libraries and the research manuscript may differ.
 
 ---
 
 ## Requirements and installation
 
-### A. Building the paper (minimal path)
+### A. Python environment
 
-Install a LaTeX distribution with `pdflatex`, `IEEEtran`, `amsmath`, `amsthm`, `algorithm`, `algorithmic`, `graphicx`, `tikz`, `subfig`, `booktabs`, `hyperref`, and a suitable BibTeX executable (`bibtex` or `bibtex8`). `latexmk` and Poppler are useful but optional.
+Use a supported Python 3 environment with Jupyter or Google Colab. The manuscript reports **Python 3.13.18**, `pqcrypto 1.0.0`, and SQLite **3.45.1** on a virtualized **Intel Xeon 2.20-GHz / two-logical-CPU** host. SQLite was configured with **WAL** and `synchronous=FULL`. Reproducing exact millisecond timings requires a comparable setup and is not guaranteed by installing the same packages.
 
-From the repository root:
-
-```bash
-latexmk -pdf -interaction=nonstopmode -halt-on-error main.tex
-```
-
-Or use explicit passes:
-
-```bash
-pdflatex -interaction=nonstopmode -halt-on-error main.tex
-bibtex main          # On systems without bibtex: bibtex8 main
-pdflatex -interaction=nonstopmode -halt-on-error main.tex
-pdflatex -interaction=nonstopmode -halt-on-error main.tex
-```
-
-The paper's PDF can be rebuilt **without** installing a cryptographic runtime. Root PDF graphs are embedded by LaTeX. Figures in `graphs/*.png` are preview copies intended for README rendering, not separate runs.
-
-### B. Running the separately supplied notebook
-
-A Python 3 Jupyter environment is needed. The notebook imports `numpy`, `pandas`, `matplotlib`, and optionally `psutil`; its **paper mode** requires a compatible `pqcrypto` implementation exposing **ML-KEM-768/ML-DSA-65** and **PyCryptodome** for optimized KMAC256. Compatibility depends on Python, platform, and library builds.
+A practical local environment is:
 
 ```bash
 python -m venv .venv
-source .venv/bin/activate       # Windows PowerShell: .venv\\Scripts\\Activate.ps1
+source .venv/bin/activate                  # Windows: .venv\Scripts\activate
 python -m pip install --upgrade pip
-python -m pip install jupyter nbconvert numpy pandas matplotlib psutil \
-    'pqcrypto==1.0.0' 'pycryptodome==3.23.0'
+python -m pip install jupyter nbconvert numpy pandas matplotlib \
+    'pqcrypto==1.0.0' 'pycryptodome>=3.20' 'cryptography>=42' \
+    'z3-solver>=4.12'
 ```
 
-If the `pqcrypto` version lacks a compatible binary wheel, use a supported platform/version and **record the substitution**. The notebook includes a documented fallback adapter for older library APIs; do not silently substitute an emulator and claim standard-library timing. Paper mode may run substantial multi-seed, cryptographic, and Monte Carlo work.
+Native mode requires a working `pqcrypto` ML-KEM-768/ML-DSA-65 API and PyCryptodome KMAC. Platform availability and native-wheel support vary. The notebook can install missing Python dependencies when allowed; for a controlled benchmark, install, pin, and record them **before** running.
+
+### B. Optional formal-tool requirements
+
+The notebook includes ProVerif models and a Z3 model. Z3 is installed through `z3-solver`. **ProVerif 2.05** must be available on `PATH` or installed/built through the notebook's optional pinned-source setup; such builds may require OCaml, build tools, internet access, and a compatible execution environment. Models that cannot execute must remain **NOT_EXECUTED / no verdict**, not be counted as proven.
+
+### C. Run profiles and evidence restrictions
+
+| Setting | Meaning | Appropriate use |
+|---|---|---|
+| `MOBIHEAL_PROFILE=QUICK` | Reduced seeds, pool size, and trials; **default** | Integration and smoke checks |
+| `MOBIHEAL_PROFILE=FULL` | Manuscript-sized workloads, including ten seeds and 1,000 native local handovers | New manuscript-comparison experiments |
+| `MOBIHEAL_BACKEND=NATIVE` | Native post-quantum primitives; **default** | Cryptographically meaningful research execution |
+| `MOBIHEAL_BACKEND=DEV` | Intentionally insecure development substitute | Structural smoke tests **only**; never paper PQ-security or timing evidence |
+| `MOBIHEAL_INSTALL=0` | Disable automatic missing-Python-package installation | Managed/offline environments |
+| `MOBIHEAL_SKIP_FORMAL=1` | Skip invoking formal solvers | Empirical-only checks; formal status remains unexecuted |
+| `MOBIHEAL_INSTALL_PROVERIF=1` | Permit optional ProVerif source-install attempt | Supported environments with the necessary build tools |
+
+The values above are notebook **environment variables**, set before starting Jupyter or the Python kernel. The notebook reads them in its first configuration cell; changing them after that cell does not retroactively reconfigure an already running experiment.
 
 ---
 
 ## Quick start and reproducibility notebook
 
-### 1. View and build the current manuscript
+### 1. Clone/open the repository
 
 ```bash
-pdflatex -interaction=nonstopmode -halt-on-error main.tex
-bibtex8 main
-pdflatex -interaction=nonstopmode -halt-on-error main.tex
-pdflatex -interaction=nonstopmode -halt-on-error main.tex
+# If already in the extracted repository, skip the clone step.
+cd MobiHeal-main
+jupyter lab code/MobiHeal.ipynb
 ```
 
-`main.pdf` contains the rendered Figure 1 (the trust-boundary drawing) and the linked Figure 2–5 plots. Read the protocol model in Section 3 before interpreting the measurements in Section 4.
+In **Google Colab**, open [the notebook](code/MobiHeal.ipynb), set its configuration to the intended profile/backend, and select **Runtime → Run all**. A Colab runtime may need extra dependencies for native cryptography and ProVerif.
 
-### 2. Review all four source result plots
-
-Open `graphs/*.png` below or inspect their PDF originals. They are static recorded plots. **Viewing a graph does not regenerate or validate the underlying samples.**
-
-### 3. Open the notebook
+### 2. Run a development smoke test (not publishable cryptographic evidence)
 
 ```bash
-jupyter lab notebooks/MobiHeal_Paper_Final.ipynb
+MOBIHEAL_PROFILE=QUICK MOBIHEAL_BACKEND=DEV \
+MOBIHEAL_INSTALL=0 MOBIHEAL_SKIP_FORMAL=1 \
+  jupyter nbconvert --to notebook --execute code/MobiHeal.ipynb \
+  --ExecutePreprocessor.timeout=-1 \
+  --output MobiHeal.quick-executed.ipynb
 ```
 
-The notebook defaults to paper mode and may attempt dependency installation. To prevent automatic installation on managed machines, set `MOBIHEAL_AUTO_INSTALL=0`. The following command runs a **development-only** smoke configuration; its emulator-backed performance values, if used, must never be reported as post-quantum native measurements:
+`DEV` uses an intentionally insecure stand-in; output is useful for catching integration errors, **not** demonstrating post-quantum performance or security. If imports are missing and the environment is offline, install the required Python packages first.
+
+### 3. Run a native, manuscript-sized experiment
 
 ```bash
-MOBIHEAL_AUTO_INSTALL=0 MOBIHEAL_PAPER_MODE=0 \
-  jupyter nbconvert --to notebook --execute notebooks/MobiHeal_Paper_Final.ipynb \
-  --output MobiHeal_Paper_Final.dev-executed.ipynb
+MOBIHEAL_PROFILE=FULL MOBIHEAL_BACKEND=NATIVE \
+MOBIHEAL_INSTALL=0 MOBIHEAL_INSTALL_PROVERIF=0 \
+  jupyter nbconvert --to notebook --execute code/MobiHeal.ipynb \
+  --ExecutePreprocessor.timeout=-1 \
+  --output MobiHeal.full-executed.ipynb
 ```
 
-To obtain new paper-mode measurements, use a properly installed native PQ backend and an isolated working directory:
+Install and verify the native PQ backend and any desired formal tools **before** this run. To allow the notebook's optional ProVerif build attempt, use `MOBIHEAL_INSTALL_PROVERIF=1` instead; an attempted install is not a guarantee that a formal model runs successfully.
 
-```bash
-MOBIHEAL_AUTO_INSTALL=0 MOBIHEAL_PAPER_MODE=1 \
-MOBIHEAL_PLATFORM_LABEL=lab-workstation-01 \
-  jupyter nbconvert --to notebook --execute notebooks/MobiHeal_Paper_Final.ipynb \
-  --output MobiHeal_Paper_Final.executed.ipynb
+The notebook internally sets `B = 1024`, seeds `2601–2610`, 10 warm-ups per seed, and 100 measured handovers per seed in FULL. Different hardware, storage, operating-system scheduling, PRNG contexts, or package builds can change the timings substantially. Report the **new measurements** alongside manuscript reference values instead of claiming exact reproduction merely from running FULL.
+
+### 4. Inspect exported evidence
+
+Upon successful completion, the notebook creates these outputs **relative to the kernel's working directory**:
+
+```text
+MobiHeal_Complete_Results/
+├── environment.json            # Platform, backend, seed and configuration metadata
+├── paper_reference.csv         # Manuscript numbers only; NOT newly measured samples
+├── README_RESULTS.md           # Evidence scope of this particular run
+├── SHA256_MANIFEST.json        # Checksums for the generated evidence
+├── figures/                    # Figures regenerated from this run
+├── formal_logs/                # Tool execution logs and status
+├── models/                     # Verification artifacts, where generated
+├── sources/                    # Emitted Python and .pv source snapshots
+└── *.csv                       # Raw results, summaries, claim/evidence ledger, etc.
+MobiHeal_Complete_Results.zip   # Export archive
 ```
 
-**Caution:** the notebook writes `results/` relative to its working directory and, by default, clears that directory before export (`MOBIHEAL_CLEAN_RESULTS=1`). Run from a clean scratch checkout, or set `MOBIHEAL_CLEAN_RESULTS=0` if existing outputs must not be deleted. Notebook execution has **not** been independently validated as part of this README update.
+Representative CSV outputs include `table_VII_chronological_*`, `table_IX_restart_*`, `table_X_persistence_*`, `figure_6_wire_bytes.csv`, `primitive_raw.csv`, `admission_raw.csv`, `concurrency_raw.csv`, and the network simulation datasets. The notebook's own output manifest is authoritative for the files generated by a specific run.
 
-### 4. Understand notebook outputs versus manuscript tables
+The repository's PNG figures are **reference assets**. Notebook plots created from newly measured data should never be silently substituted for those reference images or vice versa.
 
-A successful notebook execution is designed to create CSVs such as `handover_raw.csv`, `handover_summary.csv`, `primitive_summary.csv`, `message_sizes.csv`, `concurrency_summary.csv`, `admission_flood_summary.csv`, `network_summary.csv`, and `publication_readiness.csv`, together with a manifest, figures, and `results.zip`.
+### 5. Compare runs responsibly
 
-Treat these as **new, platform-labeled results**. They do not automatically reproduce manuscript Table 8 or its confidence intervals: those originally reported measurements have incomplete hardware/build provenance in the available paper source. Compare results only when crypto backend, persistence settings, pool size, warm-up design, and latency boundaries agree.
+Preserve the notebook source revision, `environment.json`, raw per-session timing data, RNG seed lists, library/backend versions, host CPU/storage details, and exact persistence settings. Mean and p95 are not interchangeable. A 95% bootstrap confidence interval for a *mean* is not a p95 confidence interval. Report whether the measured boundary includes durable writes, session/report persistence, warm descriptor caching, queue waiting, packet retries, and controller traffic.
 
 ---
 
 ## Figures and graphs: descriptions and interpretation
 
-This section covers **every figure in the current manuscript**. Each entry describes the plot, the result it can substantiate, what it cannot substantiate, and where to find its source. The language is explanatory and newly written; the reported values are attributed to the supplied research manuscript.
+All **six** figures listed below correspond to the supplied 13-page manuscript. Images are taken from the submitted repository ZIP. Figures 1–2 explain the mechanism; Figures 3–4 are native local-processing results; Figure 5 is a controlled network simulation; Figure 6 shows serialized message-byte accounting.
 
-### Figure 1 — Security architecture and handover trust boundary
+### Figure 1 — Integrated architecture and fast-path gates
 
-**Where:** built from the `tikzpicture` in `main.tex` (`fig:architecture`); visible in the compiled manuscript. The original figure is **not** an external file in root `graphs/`.
+![Figure 1: Architecture with security objectives and M0–M3](figs/framework-mobiheal-1.png)
 
-**What it depicts:** a vehicle exchanges four wireless messages with a target RSU; the MSC has a separate route to deliver target-specific authorization material; the previous RSU is drawn as compromised and restricted to its previously held state. The signed key-pool certificate comes from the RSU/TA trust relationship and must be checked separately.
+[View Figure 1 PNG](figs/framework-mobiheal-1.png)
 
-**Why it matters:** the single-hop recovery claim depends on *who possessed the credential before handover*. It would fail if a compromised source could simply generate the credential that the new target accepts. Independent target provisioning changes this causal relationship.
+The diagram separates the one-hop healing trust assumptions, combined security model, and actual four-message protocol. It shows `α₀` before index reservation, `β₁` before encapsulation, `α₂` before decapsulation, and durable completion before `M₃`. It should not be interpreted as measured real-world road latency.
 
-**Limits:** the picture is an architecture model, **not** a measured healing success-rate chart. It does not show real RSU geometry, road mobility traces, PHY security, or the cost of the prior provisioning connection.
+### Figure 2 — Target isolation after compromise
 
-### Figure 2 — Original fast-path processing by stage
+![Figure 2: Past compromised RSU versus target RSU](figs/mobiheal-fast-path-1.png)
 
-![Figure 2: Local handover processing stage means](graphs/fig_handover_stage_latency.png)
+[View Figure 2 PNG](figs/mobiheal-fast-path-1.png)
 
-[Original figure PDF](graphs/fig_handover_stage_latency.pdf)
+Only previously exposed material flows from the old RSU; the target is independently provisioned by the MSC. This is the trust boundary behind Proposition 1. It does not cover simultaneous compromise of the new target or disclosure of the vehicle root during the challenge.
 
-**Axes:** individual online stages along the vertical axis, with mean **local processing time in milliseconds** on the horizontal axis. Error bars describe reported variability/intervals over experimental seed means. The chart divides work between vehicle and RSU rather than collapsing it into one handshake number.
+### Figure 3 — Local processing by handover stage
 
-**What stands out:** the RSU's `M₀ → M₁` and `M₂ → M₃` steps take approximately `2.830 ms` and `3.243 ms`, respectively. Vehicle-side stages are materially shorter (`0.148`, `0.640`, and `0.122 ms`), so the combined baseline local mean is `6.982 ms`. The RSU's two durable commits are a plausible major contributor to its larger share, and the manuscript separately reports their cost.
+![Figure 3: Mean and p95 local processing by stage](graphs/fig_local_processing_stages-1.png)
 
-**Interpretation:** optimizing KEM arithmetic alone is unlikely to remove the storage-related floor in the stated implementation. This is useful for choosing what to profile next: durable write latency, transaction grouping, I/O scheduling, and end-to-end latency under contention.
+[View Figure 3 PNG](graphs/fig_local_processing_stages-1.png)
 
-**Do not conclude:** this is not the time to cross the radio interface, not the elapsed time during a moving vehicle's full handover, and **not a measurement of the revised `β₁` offer**. Its p95 summary is a separately reported distribution metric and cannot be calculated by summing five stage p95 values.
+| Stage | Mean (ms) | p95 (ms) |
+|---|---:|---:|
+| Vehicle: build `M₀` | 0.234 | 0.329 |
+| RSU: `M₀ → M₁` | 2.313 | 2.942 |
+| Vehicle: `M₁ → M₂` | 4.437 | 5.604 |
+| RSU: `M₂ → M₃` | 2.711 | 3.597 |
+| Vehicle: verify `M₃` and commit acceptance | 3.665 | 4.430 |
 
-### Figure 3 — Completion success against independent packet loss
+**Interpretation:** the vehicle's encapsulation/acceptance stages and the RSU's durable reservation/completion stages both contribute to processing. The reported five stage means add to **13.360 ms**. These are local endpoint processing costs; there is no wireless propagation or MSC round trip in that figure. Per-stage p95 values **must not be added** to infer an end-to-end p95.
 
-![Figure 3: Completion under independently lost packets](graphs/fig_loss_success_rate.png)
+### Figure 4 — Vehicle, RSU, and combined processing
 
-[Original figure PDF](graphs/fig_loss_success_rate.pdf)
+![Figure 4: Vehicle, RSU and combined processing totals](graphs/fig_local_processing_totals-1.png)
 
-**Axes:** independently assigned packet-loss probability (horizontal, %) and proportion of successfully completed simulated handovers (vertical, %). The curve uses a controlled network/mobility model with bounded retries and a preloaded local processing profile.
+[View Figure 4 PNG](graphs/fig_local_processing_totals-1.png)
 
-**What stands out:** the low-loss portion is near 100%; the reported aggregate success rate is `99.74%` at `10%` independent loss, falling to `96.63%` at `20%`. This is a smooth deterioration in a model where each packet's erasure is independently sampled; packet loss and vehicle dwell time jointly reduce opportunities for retry.
+| Category | Mean (ms) | p95 (ms) |
+|---|---:|---:|
+| Vehicle | **8.336** | 9.935 |
+| RSU | **5.024** | 6.635 |
+| Combined | **13.360** | 16.884 |
 
-**Interpretation:** idempotent cached replies and bounded retransmissions can preserve a high *modeled* completion rate in the parameter grid, but the remaining failures matter for counter reconciliation and available pool capacity.
+The manuscript gives a **95% bootstrap interval for the combined mean of [13.035, 13.781] ms**. Its reported offer and completion commit means are **1.991 ms** and **1.792 ms**, together **75.3%** of the RSU's 5.024-ms mean. The two endpoints' p95 values are empirical statistics for their respective totals; they are not additive.
 
-**Do not conclude:** the curve is **not measured on an 802.11p/C-V2X radio**, and independent packet loss cannot represent correlated fades, hidden terminals, congestion bursts, targeted jamming, or complete controller outage. The plotted completion rate is not a proof of crash safety or key secrecy.
+### Figure 5 — p95 completion latency under independent packet loss
 
-### Figure 4 — 95th-percentile handover delay under loss
+![Figure 5: p95 handover latency under independent loss and delay](graphs/fig_loss_p95_latency-1.png)
 
-![Figure 4: p95 delay across packet loss and one-way link delay](graphs/fig_loss_p95_latency.png)
+[View Figure 5 PNG](graphs/fig_loss_p95_latency-1.png)
 
-[Original figure PDF](graphs/fig_loss_p95_latency.pdf)
+This plot varies independent message-loss probability against p95 modeled completion delay, with **1, 5, 10, and 20 ms** one-way link delays. It uses the manuscript's native stage **medians**, a **6 Mb/s** link-rate parameter, bounded retransmission, and vehicle residence deadlines. Increasing delay and packet loss raises tail completion time; the figure does **not** represent on-road wireless measurements or adversarial jamming.
 
-**Axes:** packet-loss probability (horizontal, %) and simulated **p95 completion latency in milliseconds** (vertical). Separate curves represent one-way link delays of `1`, `5`, `10`, and `20 ms`, allowing radio delay and retransmission effects to be interpreted separately.
+The paper reports **100%** completion at 0% loss, **99.785%** at 10% loss, and **96.665%** at 20% loss across the modeled parameter grid. At 20%, **46,399 of 48,000** trials complete; **1,571** hit the retry limit and **30** exceed the residence deadline. These are model outcomes, not a guarantee for any deployed C-V2X or 802.11p radio.
 
-**What stands out:** at `20%` independent packet loss, the reported p95 is about `164.88 ms` for the `1 ms` one-way-delay setting and `240.88 ms` for the `20 ms` setting. The plot also has steps when a retry begins contributing to the upper tail; these are consistent with a discrete retransmission timer rather than a continuously increasing local cryptographic cost.
+### Figure 6 — Warm-cache V2I communication by KEM pool size
 
-**Interpretation:** a small cryptographic processing time does not guarantee a small vehicular handover tail latency. When link delays and retries dominate, the physical handover zone and vehicle speed become key operational parameters. At `20%` loss, the manuscript reports `96.21 ms` mean delay and `196.88 ms` average p95 over the simulated grid.
+![Figure 6: Four-message bytes by ephemeral-key pool size](graphs/fig_message_size_revised_specification-1.png)
 
-**Do not conclude:** p95 values shown for individual delay settings are **not** worst-case deadlines. The chart assumes independently erased messages and does not include empirically calibrated fading, packet fragmentation, or adversarial scheduler effects.
+[View Figure 6 PNG](graphs/fig_message_size_revised_specification-1.png)
 
-### Figure 5 — Warm-cache message bytes against Merkle-pool size
+| KEM pool size `B` | `M₀` (B) | `M₁` (B) | `M₂` (B) | `M₃` (B) | Total (bytes) |
+|---:|---:|---:|---:|---:|---:|
+| 64 | 72 | 1,536 | 1,184 | 80 | **2,872** |
+| 256 | 72 | 1,632 | 1,184 | 80 | **2,968** |
+| **1,024** | **72** | **1,728** | **1,184** | **80** | **3,064** |
+| 4,096 | 72 | 1,824 | 1,184 | 80 | **3,160** |
 
-![Figure 5: M0–M3 stacked message bytes as pool size changes](graphs/fig_message_size_breakdown.png)
-
-[Original figure PDF](graphs/fig_message_size_breakdown.pdf)
-
-**Axes:** number of ephemeral ML-KEM keys in the signed pool (`B = 64, 256, 1024, 4096`) and original fast-path radio payload bytes. Each stacked column separates the contribution from `M₀`, `M₁`, `M₂`, and `M₃`.
-
-**What stands out:** the `M₁` segment grows from `1,520 B` at `B=64` to `1,808 B` at `B=4096`, whereas the other three messages remain fixed under this serialization assumption. Each fourfold increase in pool size adds two 48-byte Merkle hashes, or **96 additional bytes** to the proof and total exchange. The resulting original totals are `2,856`, `2,952`, `3,048`, and `3,144 B`.
-
-**Interpretation:** Merkle batching amortizes offline signing while yielding logarithmic increases in online proof size. The tradeoff lies elsewhere: local ephemeral-key storage grows roughly linearly with `B`, and all keys require trustworthy lifecycle management.
-
-**Revision boundary:** the graph visualizes **original** message accounting. With the specified `β₁` tag, add **16 bytes to `M₁` and the total**: at `B=1024`, `3,048 + 16 = 3,064 B`. The changed number is an exact arithmetic consequence of the proposed message definition, **not a measured retransmission/PHY cost**.
-
-### Figure-reading checklist
-
-- For **Fig. 2**, check whether the statistic is local processing or end-to-end time before comparing it with another handover paper.
-- For **Figs. 3–4**, disclose the simulation assumptions and never describe independent-loss simulations as wireless-testbed results.
-- For **Fig. 5**, account for descriptor acquisition, certificate chains, radio headers, fragmentation, and retries before discussing actual channel load.
-- For **Fig. 1**, treat the drawing as a formal trust-boundary aid, not as evidence that the system is secure against every listed attacker.
+The current `M₁` includes the **16-byte `β₁`** tag. Merkle proofs increase by two 48-byte hashes for each fourfold pool-size increase. These are online application payload bytes under warm-cache assumptions; prepositioning, certificate-chain retrieval, radio headers, fragmentation, and retry traffic are excluded. The `B=4096` **byte total is calculated**; it is not a reported offline-preparation benchmark.
 
 ---
 
 ## Results tables: values and analysis
 
-The following subsections address **all fourteen tables in the manuscript**. The analytical/research-comparison tables are intentionally distinguished from the **numerical baseline result tables (Tables 8, 9, and 11–14)**. Numbers are taken from the supplied manuscript, not invented from screenshots or synthesized to fill missing rows.
+The manuscript contains **twelve numbered tables (I–XII)**. Tables I–VI define comparisons, threat assumptions, security consequences, and the protocol/recovery policy. Tables VII–XII summarize the chronological tests, formal results, restart/persistence tests, ablations, and pool preparation. This section preserves that numbering rather than mixing in tables from an earlier manuscript draft.
 
-### Table 1 — Related research and the question MobiHeal isolates
+### Table I — Related work and MobiHeal positioning
 
-| Research direction / example | Existing emphasis noted by the manuscript | Why MobiHeal treats it as a separate question |
+| Research direction | Emphasis described in manuscript | MobiHeal's specific emphasis |
 |---|---|---|
-| LSHSC (TDSC 2025) | Efficient group-based handover and privacy | Explicit recovery challenge after compromising formerly visited RSUs |
-| Li et al. (TDSC 2025) | Revocable cross-domain vehicular trust | The new target must not depend on an old RSU's authorization material |
-| Wang et al. (TDSC 2025) | Identity-linkage and desynchronization attacks | Privacy of a complete future transcript following historical exposure |
-| Wei et al. (TDSC 2026) | Post-quantum threshold authentication | Different trusted-controller model plus persistent single-use KEM state |
-| Blazy et al. (USENIX 2023) | Analysis of healing speed, including mobility settings | Concrete target-bound credential construction under a defined one-hop event |
-| Kumar et al. (ICCE 2026) | RSU-bound tickets and corridor privacy | Post-quantum key exchange and security challenge after compromise |
+| Lightweight group handover and vehicular privacy | Efficient privacy-preserving handover | Recovery after old-RSU state exposure |
+| Cross-domain / blockchain / ECC authentication | Revocation, cross-domain trust, linking resistance | Target-isolated credentials and transcript privacy |
+| Post-compromise healing-distance analysis | Formal recovery-speed reasoning for secure channels | First qualifying RSU transition |
+| Corridor-agnostic handover | Per-hop tickets and route privacy | Authenticated next-target recovery under compromise |
+| BAKE / RingXKEM | Merkle-authenticated post-quantum prekeys | Bound vehicle authorization plus durable prekey allocation |
+| 5G N2/Xn procedures | Core-provided or serving-key-derived mobility material | Independent target records and ephemeral ML-KEM |
+| PQ AKE / signature architectures | Certificate/signature/threshold authentication | Four-message symmetric on-air admission with preprovisioning |
 
-**How to read this table:** it provides *research positioning*, not an empirical leaderboard. A blank or differently emphasized property in prior work is **not evidence of an exploitable weakness**. Verify claims against the corresponding works before using them for scholarly novelty statements.
+This table is a **research-positioning comparison**, not a same-platform speed leaderboard. A differing objective in prior work is not evidence that those schemes are universally insecure.
 
-### Table 2 — Design comparison with other handover mechanisms
+### Table II — Adversarial exposure and security scope
 
-| Design family | How target authorization is obtained | Controller needed during every fast handover? | PQ shared-secret contribution in stated design? |
+| Exposure or fault | Manuscript condition | Scope |
+|---|---|---|
+| Previously visited RSU compromised | Allowed before healing | Historical state may be disclosed |
+| Target RSU secrets | Protected through challenge and erasure | Active target compromise excluded |
+| Vehicle / MSC root | Excluded from basic recovery challenge | Later exposure considered for retired sessions after erasure |
+| Application-key exposure | Resident key revelation | Challenged session becomes non-fresh |
+| Packet loss and replay | Adversarial network scheduling | Bounded retries and one-time state |
+| Physical tracking or jamming | External observation/disruption | Outside cryptographic privacy / availability claims |
+
+### Table III — Permitted exposure by security experiment
+
+| Exposure | One-hop recovery (OPMH) | Retired-session secrecy | Transcript privacy |
 |---|---|---|---|
-| Modeled 5G N2-style | Fresh hierarchy material through core-side procedures | Yes in the specified comparison | Not from classical hierarchy alone |
-| Modeled 5G Xn-style | Source/target mobility-key evolution | No synchronous core step for the modeled horizontal transfer | Not from classical hierarchy alone |
-| PQ certificate/signature AKE | Vehicle signing key and a validated pseudonym certificate | Not necessarily, if trust anchors are cached | Possible with ephemeral PQ KEM |
-| **MobiHeal** | Target-prepositioned authenticator plus independent ephemeral ML-KEM | **No on prepared `M₀`–`M₃` path** | **ML-KEM-768** |
+| Earlier RSUs | Before / after | Before / after | Before / after |
+| Target / signing key | After relevant retirement | After relevant retirement | Excluded |
+| Vehicle / MSC root | Excluded | After retirement | Excluded |
+| Challenged ephemeral KEM secret | Excluded | Excluded | Excluded |
+| Challenged application-key reveal | Excluded | Excluded | Not applicable |
 
-**How to read this table:** it compares architecture and the location of authority, **not measured running times**. MobiHeal moves preparatory work to a controller/channel that is assumed already available; that cost does not disappear from the deployment.
+The timing of exposure determines whether a session remains eligible for a secrecy test. A root disclosure *after erasure* is not the same adversarial experiment as stealing the active session key.
 
-### Table 3 — What kinds of disclosure are and are not tolerated
+### Table IV — Security consequences of removing components
 
-| Disclosure or fault | Scope of the proposed treatment |
-|---|---|
-| Former RSU fully disclosed | Explicitly allowed in the post-compromise scenario |
-| Current challenged target secret disclosed before safe retirement | Outside the fresh challenge's guarantee |
-| Vehicle/MSC root exposed before completion | Not permitted in the stated healing and privacy challenges |
-| Application key still resident at the endpoint | Counts as a disclosure, so the key cannot be treated as fresh |
-| Wireless injection, replay, and loss | Protocol state and authentication rules are designed around this attacker control |
-| Physical tracking or radio jamming | Not covered by cryptographic unlinkability or availability claims |
+| Component removed | Failure mechanism | Consequence |
+|---|---|---|
+| Ephemeral ML-KEM | Later symmetric root exposure | Symmetric-only historical keys can be reconstructed |
+| Target-bound authorization | Source-issued credential reuse | Impersonation at another target |
+| Request-bound `β₁` | Stale-offer substitution | Unnecessary encapsulation to a stale/spent index |
+| Durable key state | Restart/rollback | Emitted indices offered again |
+| `α₀` / `α₂` admission gates | Unauthorized processing | Invalid allocations or decapsulations |
 
-**How to read this table:** assumptions are part of the scientific claim, not footnotes to ignore. A deployment that violates one of them needs a separate proof or a narrower claimed guarantee.
+These are security-motivation and weakened-variant analyses, not evidence that all underlying attacks succeed against the complete protocol.
 
-### Table 4 — Timing of allowed exposure in different games
+### Table V — Four messages and verification order
 
-| Attacker query | One-hop healing | Retired forward secrecy | Transcript privacy |
+The paper's current fast path is `M₀` (`α₀` before reservation), `M₁` (`β₁` and Merkle proof), `M₂` (`α₂` before decapsulation, then `τⱽ`), and `M₃` (`τᴿ` before counter advancement). The full fields and message sequence are detailed under [Protocol walkthrough](#protocol-walkthrough); no extra controller round trip is on this prepared fast path.
+
+### Table VI — Loss, replay, and recovery actions
+
+The protocol requires exact cached retransmissions of `M₁`/`M₃`, authenticated BUSY responses, terminal abandonment of unresolved offers, a frozen vehicle counter on uncertain completion, and idempotent MSC reports by handle `g`. See [Loss, replay, crash, and controller recovery](#loss-replay-crash-and-controller-recovery-table-vi) for the complete policy table.
+
+### Table VII — Chronological same-root recovery tests
+
+| Test | Manuscript outcome | Result |
+|---|---|---:|
+| Replay | Previously exposed transcript rejected | **100/100** |
+| Credential | Exposed old-target credential rejected | **100/100** |
+| Context | Altered target/request context rejected | **100/100** |
+| Recovery | First eligible target exchange completes | **100/100** |
+| Allocation | Unauthorized target allocations | **0** |
+| RSU | Unauthorized RSU completions | **0** |
+| Vehicle | Unauthorized vehicle acceptances | **0** |
+| Agreement | Matching accepted application keys | **100/100** |
+
+The same vehicle root is retained over the earlier completed handover and subsequent honest-target handover. The attacker obtains historical RSU signing and mobility records, old cached messages, and un-erased private keys, then attempts the negative controls **before** the new exchange. These **100 sampled tests** demonstrate the intended chronological authorization boundary but are not a full attack-space proof.
+
+### Table VIII — Formal security and bounded state verification
+
+| ID | Property or control | Paper result | Interpretation |
 |---|---|---|---|
-| Past RSU state | Before or after | Before or after | Before or after |
-| New target/signing key | After applicable retirement only | After applicable retirement only | Not disclosed in the privacy challenge |
-| Vehicle/MSC root | Not disclosed | After retirement only | Not disclosed |
-| Challenged ephemeral decapsulation secret | Not disclosed | Not disclosed | Not disclosed |
-| Test application key | Not revealed | Not revealed | Not applicable |
+| PV1–PV2 | Transcript-bound injective authentication correspondences | **true (both)** | Formal explicit-transcript model |
+| PV3 | Application challenge-payload non-derivability | **true** | Symbolic payload secrecy |
+| PV4 | Matched-context observational equivalence | **true** | **One** transcript challenge |
+| PV5 | Authentication/secrecy after **target** credential exposure | **false (both)** | Expected negative control |
+| PV6–PV7 | Authentication and secrecy across two same-root handovers | **true** | Chronological symbolic model |
+| PV8 | Identity swapping and multiple-challenge linkage | **No verdict** | Property unestablished |
+| Z1–Z7 | Index uniqueness, state ordering, single decapsulation, gates, counters, exclusive allocation | **unsat (7)** | No bounded violation under assumptions |
+| Z8 | Completion, interleavings, retries, crash abandonment, cached reply, abstract reconciliation | **sat (6)** | Valid patterns reachable |
+| Z9 | Fault-injected storage rollback | **sat** | Violating counterexample exists |
 
-**How to read this table:** the point is *when* a secret is revealed. Permitting the challenge application's actual key to leak after the test but before the attacker's guess would trivialize an indistinguishability game. Similarly, giving out the target's pseudonym mapping in a privacy challenge would defeat the intended experiment by definition.
+The paper names ProVerif **2.05**, an explicit-transcript model, a same-root two-handover model, and a matched-context privacy model. The Z3 configuration uses **two groups, three KEM indices, two attempts per group, and ten transitions**. Verification is model-bound; `unsat` is not a claim about unbounded real storage, and PV8 must not be listed as a proven unlinkability result.
 
-### Table 5 — Why particular components cannot simply be removed
+### Table IX — Native process-restart validation
 
-| Removed or changed component | Illustrative consequence |
-|---|---|
-| Independent ML-KEM contribution | Later discovery of the symmetric root can reveal keys derived only from historical symmetric material |
-| Target-specific credential isolation | A compromised source may carry authorization that works at a future target |
-| Request-bound `β₁` offer authenticator | A previously genuine Merkle-pool offer can be substituted outside the current request context |
-| Durably tracked offered/spent states | A restart may advertise the same already-exposed public key to a second session |
-| Authenticated admission gates | An attacker can waste scarce allocations or expensive decapsulation work |
+| Fault point | Expected result | Passed |
+|---|---|---:|
+| After reservation | Abandon incomplete offer | **10/10** |
+| During `M₂` | Abandon before completion commit | **10/10** |
+| After completion | Restore exact cached `M₃` | **10/10** |
+| Before vehicle commit | Leave counter unchanged | **10/10** |
+| After vehicle commit | Handle duplicate `M₃` only once | **10/10** |
 
-**How to read this table:** these are **motivating failure cases for deliberately weakened variants**. The manuscript does not supply complete same-platform latency/security ablation curves for every row, so the table should not be described as five measured attack success rates.
+**50/50 checks** passed across five restart points. The tests also exercise post-restart application-key use, but do **not** establish physical secure erasure, firmware rollback resistance, or a full deployed MSC recovery path.
 
-### Table 6 — Protocol message fields and verification order
+### Table X — RSU completion persistence and restart validation
 
-| Message | Main contents | Essential ordering constraint |
+| Category | Metric | Manuscript result |
+|---|---|---:|
+| Processing | `M₂ → M₃`, session/report storage **off** | **2.991 ms** |
+| Processing | `M₂ → M₃`, session/report storage **on** | **3.453 ms** |
+| Transaction | Completion mean | **2.533 ms** |
+| Transaction | SQLite commit call mean | **2.396 ms** |
+| MSC report | **Local** idempotent delivery sequence | **13.700 ms** |
+| Logical record | Application fields | **124 bytes** |
+| Logical record | Pending report | **80 bytes** |
+| Logical record | Cached `M₃` | **80 bytes** |
+| Restart | Mid-transaction rollback | **100/100** |
+| Restart | Receipt / pre-ack restart | **100/100** |
+| Restart | Post-commit recovery | **100/100** |
+
+The **0.462-ms (15.4%)** increase applies to this **separately measured storage-on/off experiment**, not to a fresh recomputation of the Figure 3 local-stage means. The paper uses AES-GCM-wrapped application keys, an independently managed wrapping key, durable cached confirmations, and pending reports addressed by `g`. The reported 13.700 ms is a **local SQLite delivery/acknowledgment sequence**, *not* a controller-network RTT. Logical record sizes exclude database page/index overhead.
+
+### Table XI — Component-removal experiments
+
+| Deliberately weakened variant | Tested consequence | Observed result |
 |---|---|---|
-| `M₀` | Pseudonym, window, vehicle nonce, admission tag | Authenticate before allocating a key |
-| `M₁` | RSU, epoch, index, nonce, ML-KEM public key, Merkle path, offer tag | Authenticate active offer and pool proof before encapsulating |
-| `M₂` | Pseudonym, nonce, ciphertext, pre-KEM tag, vehicle key confirmation | Validate `α₂` before decapsulation; validate `τⱽ` afterward |
-| `M₃` | Session identifier, RSU key confirmation | Commit and erase on RSU; vehicle advances counter only after verification |
+| Reusable source credential | Impersonation after old-RSU compromise | **10/10** unauthorized acceptances and allocations |
+| No ephemeral ML-KEM | Symmetric-only key recovery after root exposure | **10/10** reconstructed |
+| No `β₁` | Stale offer accepted for encapsulation | **10/10** triggered; **0** unauthorized completions |
+| No `α₀` | Invalid request reaches key allocation | **10** allocations and **10** abandoned indices |
+| No `α₂` | Invalid `M₂` reaches KEM decapsulation | **10** decapsulations and **10** abandoned indices |
+| Forced state rollback | Emitted KEM index offered again | **10/10** reoffers |
 
-**How to read this table:** the value is in the *gate ordering*. The revision's `β₁` is part of `M₁` in the current specification, while the reported baseline measurements precede this added work.
+The missing-`β₁` outcome is **not** a complete RSU impersonation: it caused wasteful stale-offer encapsulation, but no unauthorized completion in the tested traces. The six rows target different mechanisms and should not be merged into a single attack-success statistic.
 
-### Table 7 — Replay, packet-loss, and recovery policy
+### Table XII — Offline Merkle pool preparation
 
-| Adverse event | Safe handling |
-|---|---|
-| Invalid `M₀` or `M₂` | Fail before reservation or KEM decapsulation |
-| BUSY response or invalid/stale `M₁` | Check the authenticating tag; reject forged BUSY indications and substituted offers |
-| `M₁` lost | Replay precisely the same saved `M₁` after an identical `M₀` |
-| `M₂`/`M₃` lost | Retry exact `M₂` and replay saved `M₃` after completion |
-| Offer timeout or RSU crash | Rely on committed state and retire/abandon exposed indices |
-| Completion remains uncertain | Keep counter fixed; use the MSC's authenticated slow path |
-| MSC completion report is delayed | Reconcile by the opaque, idempotent handle |
+| Pool size `B` | Native preparation (ms) | Preparation per key (ms) |
+|---:|---:|---:|
+| 64 | **63.825** | **0.9973** |
+| 256 | **93.114** | **0.3637** |
+| 1,024 | **227.677** | **0.2223** |
 
-**How to read this table:** this is a protocol policy matrix rather than a test coverage matrix. Physical storage rollback, actual power-loss injection, and prolonged unavailability still need dedicated verification.
+The benchmark includes SQLite initialization with WAL/FULL persistence, ML-DSA-65 key generation, `B` ML-KEM key-pair generations, database insertion and commit, tree construction, and descriptor signing. It excludes target provisioning, certificate verification, pool refill, transmission, and shutdown. **No preparation time is reported for `B=4096`**; Figure 6 provides only its communication-size accounting.
 
-### Table 8 — Original four-message local processing (**reported measurements**)
+### Additional evaluation figures and measurements
 
-| Processing stage | Mean (ms) | p95 (ms) |
-|---|---:|---:|
-| Vehicle builds `M₀` | 0.148 | 0.201 |
-| RSU handles `M₀ → M₁` | 2.830 | 3.780 |
-| Vehicle handles `M₁ → M₂` | 0.640 | 0.780 |
-| RSU handles `M₂ → M₃` | 3.243 | 4.342 |
-| Vehicle authenticates `M₃` | 0.122 | 0.174 |
-| **Vehicle subtotal** | **0.910** | **1.098** |
-| **RSU subtotal** | **6.073** | **7.737** |
-| **Combined local processing** | **6.982** | **8.701** |
-
-**Interpretation:** RSU work dominates this local profile. Reported 95% intervals for the **means over seed means** are `[0.894, 0.924] ms` (vehicle), `[5.765, 6.378] ms` (RSU), and `[6.668, 7.296] ms` (combined). Component means are independently rounded, so displayed subtotals may not exactly match recomputation from three-decimal rows. **Do not add the p95 stage values**; percentiles of different distributions do not compose that way.
-
-**Measurement boundary:** these numbers exclude radio transmission, queueing, an online controller trip, offline pool creation, and descriptor delivery. They concern the **original implementation**, not the request-bound `β₁` revision.
-
-### Table 9 — Cryptographic operations versus durable writes (**reported measurements**)
-
-| Local operation | Mean (ms) |
-|---|---:|
-| ML-KEM-768 encapsulation | 0.101 |
-| ML-KEM-768 decapsulation | 0.134 |
-| KMAC256 producing 32 bytes | 0.025 |
-| Merkle proof check at depth 10 | 0.016 |
-| ML-DSA-65 signing the pool descriptor | 11.660 |
-| Durable offer transaction | 2.745 |
-| Durable completion transaction | 2.693 |
-
-**Interpretation:** the two durable writes total `5.438 ms`, approximately **89.5%** of the RSU's `6.073 ms` original local mean. This identifies persistence as a major performance consideration for the reported environment, not a statement that the cryptographic primitives are cost-free. The signing time is **offline** and is not included as a signing operation for every `M₁`.
-
-**Measurement caveat:** operation times may have different invocation/caching conditions and cannot be combined into a new precise handshake distribution. The original machine, storage, crypto build, and per-run source data are not fully characterized by this archival source.
-
-### Table 10 — Strength of the claimed security evidence
-
-| Security property | Supporting reasoning | Missing evidence for stronger claims |
+| Experiment | Manuscript setup or result | Evidence type |
 |---|---|---|
-| Cross-target verifier independence | PRF argument for distinct target-specific derivation domains | Full multi-session impersonation reduction |
-| Correct shared keys in an honest run | ML-KEM correctness and deterministic, canonical transcript schedule | Protection against all active/interleaved executions |
-| Retired-session secrecy | Independent ephemeral entropy and secure deletion assumptions | Complete advantage reduction under all allowed late compromises |
-| Non-reissue of an offered pool index | Irreversible state transitions under durable atomic transactions | Power failure, rollback, and backend-specific erasure proof |
-| Active AKE and transcript unlinkability | Explicit game definitions, matching sessions, confirmation tags | Independently checkable proof/equivalence artifacts |
+| Stage / combined local timing | **1,000** native handovers; ten seeds, ten warm-ups plus 100 measured each | Host-specific measured processing |
+| Mean combined processing interval | **[13.035, 13.781] ms** (bootstrap seed means) | Confidence interval for the mean |
+| Authenticated admission/retransmission | **210/210** targeted checks; 21 cases × 10 seeds | Functional tests |
+| Concurrent duplicate packets | **10/10** checks per message type | Targeted concurrency tests |
+| Unknown pseudonym rejection | **49,207** requests/s | Invalid-request throughput |
+| Invalid `α₀` rejection | **22,847** requests/s | Invalid-request throughput |
+| Invalid `α₂` rejection | **5,450** requests/s | Invalid-request throughput |
+| One-worker throughput | Approximately **68** handovers/s | Concurrent host benchmark |
+| Eight-worker throughput | Approximately **105** handovers/s | Concurrent host benchmark |
+| 128-worker latency | Approximately **861 ms** mean and **1,081 ms** p95 | Concurrent-session latency |
+| Network study | **288,000** independent-loss Monte Carlo trials | Controlled simulation |
+| Loss 0% / 10% / 20% | **100% / 99.785% / 96.665%** completion | Controlled simulation |
+| Loss 20% outcomes | **46,399** complete; **1,571** retry-limit; **30** dwell-deadline | Controlled simulation |
 
-**Interpretation:** analytical assumptions, invariants, and experimental evidence are *different kinds of support*. A passing self-test does not imply negligible cryptographic distinguishing advantage.
-
-### Table 11 — Rejection of unauthorized handover traffic (**reported measurements**)
-
-| Invalid input class | Handled requests / second | Mean rejection cost (µs) |
-|---|---:|---:|
-| `M₀` with unknown pseudonym | 1,245,742 | 0.82 |
-| Known pseudonym, incorrect `α₀` | 38,342 | 26.23 |
-| `M₂` with incorrect `α₂` | 18,299 | 56.03 |
-
-**Interpretation:** inexpensive lookup rejection is far faster than checking a tag for a known record. These tests reported **zero unauthorized KEM reservations and zero unauthorized KEM decapsulations** for the specific bad-input categories. The throughput measures *reject operations*, not successful handovers or network capacity. An attacker with knowledge of a legitimate, unused pseudonym can still induce symmetric verification work; radio flooding and compromised authorized participants remain separate threats.
-
-### Table 12 — Concurrent completed handovers (**reported measurements**)
-
-| Outstanding sessions | Completed sessions/s | Mean completion latency (ms) | p95 latency (ms) |
-|---:|---:|---:|---:|
-| 1 | 110.5 | 9.0 | 14.3 |
-| 8 | 105.2 | 75.0 | 124.3 |
-| 32 | 103.2 | 291.2 | 458.1 |
-| 64 | 107.5 | 517.1 | 725.3 |
-| 128 | 109.4 | 857.4 | 1,082.4 |
-
-**Interpretation:** the completed-session rate stays near the same capacity band across the grid, while waiting time grows markedly with more simultaneous requests. At 128 outstanding sessions, p95 completion is about **75.7 times** the single-session p95 (`1,082.4 / 14.3`), even though throughput is similar. This looks like a single-host capacity/queueing limit in the test arrangement, **not** evidence about multi-host scaling or real RSU clusters.
-
-### Table 13 — Ephemeral-pool setup and storage tradeoff (**reported measurements/accounting**)
-
-| Pool size `B` | Offline preparation (ms) | Pool storage (MiB) | Original warm-cache total (bytes) |
-|---:|---:|---:|---:|
-| 64 | 16.332 | 0.225 | 2,856 |
-| 256 | 30.126 | 0.890 | 2,952 |
-| **1,024** | **87.308** | **3.551** | **3,048** |
-| 4,096 | **Not reported** | 14.195 | 3,144 |
-
-**Interpretation:** larger pools reduce the frequency of signing a new descriptor relative to the number of handovers available from a prepared batch; in return, they require more protected ephemeral private-key storage. The reported preparation cost per key decreases from approximately `0.2552 ms/key` (`B=64`) to `0.0853 ms/key` (`B=1024`). This does **not** justify inventing a preparation time for `B=4096`.
-
-### Table 14 — Per-message V2I payload sizes (**reported original accounting**)
-
-| Pool size `B` | `M₀` (B) | `M₁` (B) | `M₂` (B) | `M₃` (B) | Original total (B) | Revised total with `β₁` (B) |
-|---:|---:|---:|---:|---:|---:|---:|
-| 64 | 72 | 1,520 | 1,184 | 80 | 2,856 | 2,872 |
-| 256 | 72 | 1,616 | 1,184 | 80 | 2,952 | 2,968 |
-| **1,024** | **72** | **1,712** | **1,184** | **80** | **3,048** | **3,064** |
-| 4,096 | 72 | 1,808 | 1,184 | 80 | 3,144 | 3,160 |
-
-**Interpretation:** `M₁` is the only message whose length depends on the Merkle proof depth in the shown encoding. An increment of two tree levels adds `2 × 48 = 96 bytes`. The **revised total** column is calculated by adding one 128-bit `β₁` tag to the original `M₁`; it is **not a newly measured transmission**, and the source graph depicts the original version. The paper separately mentions `5,309` cold-cache cryptographic bytes beyond the warm exchange, with certificate-chain overhead not fully fixed. Do not add that to every handover without checking the actual descriptor retrieval policy.
-
-**Radio caveat:** neither accounting version includes PHY/MAC headers, message retransmission, link-layer fragmentation, routing, or control-plane prepositioning. These can materially affect air-time and mobility reliability.
-
-### Supplementary numerical results not assigned a dedicated manuscript table
-
-| Scenario | Manuscript-reported value | Evidence class and meaning |
-|---|---|---|
-| Independent packet loss = 10% | **99.74%** average completion | Controlled modeled loss/mobility simulation |
-| Independent packet loss = 20% | **96.63%** average completion | Controlled modeled loss/mobility simulation |
-| Independent packet loss = 20% | **96.21 ms** mean completion | Averaged over reported modeled conditions |
-| Independent packet loss = 20% | **196.88 ms** average p95 completion | Average of p95 statistics over simulation conditions |
-| 20% loss, 1-ms one-way delay | **164.88 ms** p95 | Model at specified one-way delay |
-| 20% loss, 20-ms one-way delay | **240.88 ms** p95 | Model at specified one-way delay |
-| High-mobility corner case | **95.86%** completion | 120 km/h, 10-m zone, 20-ms delay, 20% loss in the modeled grid |
-| Baseline protocol functional checks | **16** reported passing self-checks | Functional checks, not formal proofs |
-| Baseline restart experiments | **10 seeds** reported | Limited controlled test scope, not power-loss hardware certification |
+**Network simulation parameters:** packet-loss rates `{0,1,3,5,10,20}%`, one-way delays `{1,5,10,20} ms`, vehicle speeds `{30,60,90,120} km/h`, zone lengths `{10,25,50} m`, seeds `2601–2610`, and 100 trials per parameter cell per seed. There are **48,000 trials per loss rate**. A retry timer of **50 ms**, at most **four transmissions per request/response stage**, a **6 Mb/s** modeled radio, and residence deadline `T_dwell = 3.6 L_zone / v` seconds define the model. Native stage medians are used as processing inputs rather than replacing observed packet loss with real-radio measurements.
 
 ---
 
 ## Metrics and result interpretation
 
-| Symbol or metric | Operational definition | Avoid this mistaken interpretation |
+| Metric | Meaning in this study | What it does **not** mean |
 |---|---|---|
-| `d_heal` | Number of eligible completed honest-target transitions to a fresh accepted session following prior RSU corruption | Number of radio packets, milliseconds to recovery, or guaranteed recovery after any reassociation |
-| Key indistinguishability advantage | Difference from random guessing in a properly fresh application-key game | A measured byte-error rate or self-test pass fraction |
-| Transcript privacy advantage | Ability to identify a tested vehicle from complete handover transcripts under matched public context | Physical anonymity or secrecy of timing/location metadata |
-| `L_loc` | Local processing spent by both endpoints in the original implementation | End-to-end handover latency over the air |
-| Stage p95 | 95th percentile of that particular stage or end-to-end distribution | A worst-case deadline or an additive quantity |
-| `C_v2i` | Application-level message payload with descriptor already cached | Total cellular/WLAN byte consumption per mobility event |
-| `B` | Number of prepared ephemeral KEM indices at one RSU epoch | Number of vehicles that can always be served (abandoned offers also consume keys) |
-| Admission rate | Rejected requests per second in a given invalid-input category | Legitimate completed-handshake capacity |
-| Completed throughput | Successful handshakes completed per second on the measured system | Capacity of every distributed deployment |
-| Loss completion rate | Fraction completing before modeled mobility/retry budget ends | Guarantee against active radio interference |
-| Durability invariant | Offered keys cannot return to free on an assumed atomic, rollback-resistant store | Forensic secure erase of overwritten physical storage blocks |
+| `d_heal` | Eligible honest-target transitions needed after past-RSU compromise | Number of messages or guaranteed wall-clock recovery time |
+| Authentication recovery | Matching transcript-bound accepted sessions under permitted prior compromise | Recovery when the current target is hostile |
+| `K_app` secrecy | Distinguishing/reveal game subject to freshness exclusions | Continued secrecy after the challenged application key is disclosed |
+| Retired-key secrecy | Late root disclosure after effective KEM/application-key retirement | Proof of secure erase for physical SSD blocks or snapshots |
+| Transcript unlinkability | Cryptographic linkage under matched public mobility context | Real-world anonymity against location or RF observation |
+| Local processing | Vehicle + RSU CPU, serialization, locks and measured persistence | Wireless airtime, queuing, provisioning, or controller RTT |
+| p95 latency | Empirical 95th percentile of that specific dataset | Worst-case bound or sum of stage p95 values |
+| `C_v2i` | Sum of serialized warm-cache `M₀`–`M₃` payload bytes | Total radio/MAC traffic in a physical deployment |
+| Pool size `B` | Number of independently generated one-time KEM indices | Guaranteed number of successful handovers (abandoned offers consume slots) |
+| Admission rejection throughput | Invalid messages checked/denied per unit time | Successful handovers/s |
+| Z3 `unsat` | No violating trace in a bounded abstract state model | Proof of arbitrary-duration rollback-resistant storage |
+| ProVerif `true` | Query satisfied under an explicit symbolic process model | Computational PQ AKE theorem or verification of implementation binaries |
 
-### Four evidence categories used in this README
+### Evidence categories used in this README
 
-1. **Manuscript-reported native measurement:** original stage/primitives/admission/concurrency/pool preparation tests. Replication requires matching experimental conditions and raw measurements not fully available in the manuscript archive.
-2. **Manuscript-reported controlled simulation:** independent packet-loss results derived under explicit delay, speed, handover-zone, and retry rules. These are not field observations.
-3. **Analytical calculation:** message-size changes from the 16-byte revised offer and formula-based pool/proof growth. Mathematical calculations do not establish revised execution time.
-4. **Protocol reasoning / functional check:** trust assumptions, invariants, and self-tests that verify particular operations or transitions but do not alone establish active AKE/privacy security.
+1. **Manuscript-reported native measurement:** processing stages, persistence, admission throughput, concurrency, and offline pool preparation, measured on the manuscript's specified host configuration.
+2. **Manuscript-reported controlled simulation:** completion and p95 delay under independently erased messages, bounded retransmission, and mobility deadlines.
+3. **Protocol/formula accounting:** exact message sizes for the stated serialization and Merkle-tree depth, including request-bound `β₁`; this is not link-layer packet capture.
+4. **Security reasoning and tool models:** propositions, protocol invariants, functional negative controls, ProVerif queries, and bounded Z3 checks, each with stated assumptions.
+5. **New notebook run:** results generated on the user's environment, with actual measured CSVs, hashes, solver output, and explicit `NATIVE` versus insecure `DEV` status. These are *not automatically the published values*.
 
 ---
 
 ## Limitations, validation gaps, and future experiments
 
-### Security boundaries
+### Security scope
 
-The new target, the controller, and the vehicle root must remain appropriately trusted for the one-hop healing argument. The attacker can capture prior RSU information and manipulate the wireless exchange, but revealing the challenged target's active private key or the tested application's key is not a valid *fresh* challenge. Even with strong ML-KEM/ML-DSA primitives, a missing certificate check, an incorrect transcript encoding, reused ephemeral state, or leaked application key can defeat protocol-level claims.
+One-hop recovery depends on distinct, trusted target provisioning. An exposed new-target authorization key can enable impersonation **at that target**. The basic recovery/privacy experiment excludes compromise of the vehicle/MSC root during the challenge and reveal of the challenged KEM/application key. Retired secrecy requires effective erasure of KEM secrets and old application keys, including backups, logs, snapshots, and reconstruction seeds.
 
-### Missing or incomplete evaluations
+The matched-context privacy experiment does not cover physical following, radio fingerprinting, retransmitted identical messages, known routes, application tracking, or deliberate jamming. State-safety statements depend on durable, atomic, rollback-resistant storage—not merely on a database API that usually commits successfully.
 
-| Needed investigation | Why it changes confidence in the results | Current evidence status |
+### Validation gaps and unfinished claims
+
+| Area | What is supported | What remains to be established |
 |---|---|---|
-| Native timing of `β₁` offer and changed verification order | The revised protocol performs additional authentication and storage/encoding work | **Not separately benchmarked** in manuscript |
-| Full MSC `B₀`–`B₃` fallback | Controller round trips and reconciliation may dominate tail latency | **Specified, not fully measured** |
-| Crash/power-cut and rollback experiments | SQLite-style logical durability does not prove physical media erasure or anti-rollback | Functional restart checks only |
-| Formal multi-session AKE and privacy analysis | Concurrent sessions, compromise timing, and transcript scheduling can create subtle attacks | Complete reductions/model proofs not provided |
-| Matched common-platform baselines | Hardware/software differences prevent trustworthy cross-paper speed rankings | Comparable measured baselines not provided |
-| Correlated fading and actual radio packetization | Independent packet loss does not capture deployed V2X channels | Simulation only |
-| Pool exhaustion/DoS under traffic bursts | Even authenticated failures may consume reserved one-time keys | Admission microbenchmarks plus capacity reasoning |
-| Prepositioning reliability and MSC compromise | Target preparation is a prerequisite for the fast-path design | Outside the immediate measured path |
+| One-hop authorization isolation | PRF argument and chronological native tests | Complete active multi-session computational impersonation analysis |
+| Application and retired-key secrecy | Honest-run key agreement, ProVerif payload model, conditional erasure reasoning | Computational key-indistinguishability proof including concurrent transcript dependencies |
+| Transcript privacy | Single-challenge matched-context symbolic equivalence | Identity-swap/multi-challenge unlinkability proof (PV8 has no verdict) |
+| KEM index safety | Z3 bounded invariants and native process-restart checks | Physical power-cut, storage rollback, and key-erasure verification |
+| Controller recovery | `B₀`–`B₃` specification and abstract/local-receiver checks | Networked, timed, end-to-end MSC protocol and outage analysis |
+| Full PKI validation | Trust model and certificate-verification requirements | Production-grade chain, revocation, epoch, and anti-rollback integration in the notebook |
+| Load and packet loss | Host concurrency and independent-loss mobility simulation | Real radio tests, correlated fading, congestion, fragmentation, jamming, and multi-host deployment |
+| Reproducible timing | Native hardware/software configuration and trial counts | Matched hardware/storage and unaggregated cross-platform replication |
 
-### Recommended reproducibility protocol
+### Recommended research validation workflow
 
-Use the **same source revision**, record crypto backend/library versions, host CPU, storage device, OS/kernel, clock source, seed count, repetitions, warm-ups, `B`, descriptor-cache conditions, and persistence settings. Publish unaggregated timings and paired repetitions rather than only final means. Report both p50 and tail latency after radio delay/fragmentation is modeled, keep native and simulated outcomes in separate tables, and state precisely whether `β₁` was enabled.
+Run `QUICK` to catch code and dependency errors, then `FULL` with a pinned **NATIVE** backend to collect fresh measurements. Retain `environment.json`, raw CSVs, figure source data, generated model source, tool logs, and `SHA256_MANIFEST.json`. Verify formal-model output **per query** rather than treating model execution as a single pass/fail flag. Explicitly mark a model *no verdict* when verification does not finish.
 
-A useful security regression suite should include valid handovers, cross-target pseudonym replay, corrupted `M₁` signatures/Merkle proofs, misbound `β₁`, bad `α₂`, duplicated `M₀`/`M₂`, crash after every durable commit, delayed `M₃`, delayed MSC completion report, expired descriptor, and restarted storage with attempted index reuse. Each test should state the expected admission/decapsulation count and final durable state.
+For future security regressions, test old-RSU credential reuse, target/context substitution, invalid `α₀`, invalid `β₁`, invalid `α₂`, stale/replayed `M₁`, identical concurrent `M₂`, invalid BUSY, crash at each commit boundary, lost `M₃`, delayed MSC reports, and forced storage rollback. Report both the attacked **mechanism** and its observed **outcome**; for example, stale-offer encapsulation is not the same as unauthorized session completion.
 
-### Research-use notes
+### Research-use note
 
-This is a research artifact and a protocol proposal, **not deployment-certified vehicular authentication software**. In particular, its cryptographic privacy experiment does not ensure location privacy against roadside observation, and its modeled packet-loss numbers cannot be used as guarantees of real-road connectivity. Treat design assumptions and evaluation boundaries as part of every citation.
+MobiHeal is a research protocol and research implementation, **not certified production V2X authentication software**. An illustrative benchmark or a symbolic result should never be presented as a blanket statement about safety in deployed vehicles. All comparative claims must preserve the setup, measured boundary, and threat-model exclusions.
 
 ---
 
 ## Research attribution and use
 
-This README is a **newly written technical interpretation and navigation guide** based on the supplied MobiHeal manuscript, plots, and notebook. It uses attributed research terminology, equations, numerical findings, and protocol facts, but does not reproduce the manuscript's explanatory paragraphs as documentation prose. Reusing factual measurements with correct attribution is different from presenting someone else's writing as original.
+**Manuscript:** *MobiHeal: One-Hop Compromise Recovery for Post-Quantum Vehicular Handover*  
+**Authors:** Anam Nasir, Uddin Md. Borhan, Arif Raza, Xiang He, and Zhongjie Wang.  
+**Research domain:** Internet of Vehicles, post-quantum authenticated key exchange, one-hop post-compromise recovery, unlinkability, and dependable mobility security.
 
-When referring to the research in scholarly work, cite the actual paper/manuscript and its authors, not only this repository description. Verify the publication venue, DOI, and final bibliographic record before preparing a formal citation; the supplied source alone does not establish a publication DOI. The manuscript bibliography is in [`references.bib`](references.bib).
+The manuscript's research contributions and numerical measurements are attributed to its authors. This README is an explanatory guide aligned to the **supplied 13-page manuscript** and the **actual contents of the supplied GitHub ZIP**; it is not a claim of independent reproduction of all manuscript measurements. The paper is formatted for *IEEE Transactions on Dependable and Secure Computing*, but a publication DOI and final publication status should be verified separately rather than inferred from the manuscript header.
 
-**Attribution:** *MobiHeal: One-Hop Compromise Recovery for Post-Quantum Vehicular Handover* — **Anam Nasir, Md. Borhan, Arif Raza, Xiang He, and Zhongjie Wang**. Numerical figures and the stated protocol design in this README are credited to that supplied research manuscript unless expressly marked as analytical explanation or a new notebook run.
-
-**Reuse permissions:** no top-level license was supplied with the manuscript archive. Do not infer an open-source license or redistribution grant merely because the files can be viewed in a repository.
+The repository code and documentation have an [MIT license](LICENSE) as supplied; underlying PQ libraries, external research papers, and the manuscript itself may have separate terms. When using MobiHeal in research, cite the manuscript and preserve the distinction between paper results, executable-model evidence, and new notebook runs.
