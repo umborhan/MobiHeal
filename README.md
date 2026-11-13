@@ -85,9 +85,9 @@ For target identifier `rₖ`, validity window `w`, hidden vehicle counter `c`, a
 
 $$
 \begin{aligned}
-C_{k,w,c,a} &= \operatorname{enc}(r_k,w,c,a),\\
-A_a &= \operatorname{KMAC}_{S_i}(C_{k,w,c,a};256,d_A),\\
-P_a &= \operatorname{Trunc}_{128}\!\left(\operatorname{KMAC}_{S_i}(C_{k,w,c,a};256,d_P)\right).
+C_{k,w,c,a} &= \mathsf{enc}(r_k,w,c,a),\\
+A_a &= \mathrm{KMAC}_{S_i}(C_{k,w,c,a};256,d_A),\\
+P_a &= \mathrm{Trunc}_{128}\!\left(\mathrm{KMAC}_{S_i}(C_{k,w,c,a};256,d_P)\right).
 \end{aligned}
 $$
 
@@ -105,9 +105,9 @@ For an authenticated offer, the vehicle encapsulates `(ct,Z) ← Enc(pⱼ)` and 
 
 $$
 \begin{aligned}
-h_2 &= H(d_2\|\operatorname{enc}(M_0,M_1,P_a,N_V,ct)),\\
-Y_A &= \operatorname{KMAC}_{A_a}(h_2;256,d_{\mathrm{mixA}}),\\
-Y_Z &= \operatorname{KMAC}_{Z}(h_2;256,d_{\mathrm{mixZ}}),\\
+h_2 &= H(d_2\|\mathsf{enc}(M_0,M_1,P_a,N_V,ct)),\\
+Y_A &= \mathrm{KMAC}_{A_a}(h_2;256,d_{\mathrm{mixA}}),\\
+Y_Z &= \mathrm{KMAC}_{Z}(h_2;256,d_{\mathrm{mixZ}}),\\
 K^* &= Y_A \oplus Y_Z.
 \end{aligned}
 $$
@@ -116,10 +116,10 @@ Here `H` is SHA3-384, `Z` is the KEM shared secret, `d` labels are distinct `MOB
 
 $$
 \begin{aligned}
-h &= H(d_h\|\operatorname{enc}(M_0,M_1,M_2)),\\
-K_v &= \operatorname{KMAC}_{K^*}(h_2;256,d_{\mathrm{cv}}),\\
-K_r &= \operatorname{KMAC}_{K^*}(h;256,d_{\mathrm{cr}}),\\
-K_{\mathrm{app}} &= \operatorname{KMAC}_{K^*}(h;256,d_{\mathrm{app}}).
+h &= H(d_h\|\mathsf{enc}(M_0,M_1,M_2)),\\
+K_v &= \mathrm{KMAC}_{K^*}(h_2;256,d_{\mathrm{cv}}),\\
+K_r &= \mathrm{KMAC}_{K^*}(h;256,d_{\mathrm{cr}}),\\
+K_{\mathrm{app}} &= \mathrm{KMAC}_{K^*}(h;256,d_{\mathrm{app}}).
 \end{aligned}
 $$
 
@@ -167,7 +167,7 @@ The MSC provisions the target-specific `Qₖ,g` record on an authenticated confi
 The vehicle selects a fresh 128-bit nonce `N₀` and computes:
 
 $$
-\alpha_0=\operatorname{KMAC}_{A_a}\!\left(H(d_0\|\operatorname{enc}(r_k,w,P_a,N_0));256,d_{\mathrm{adm}}\right).
+\alpha_0=\mathrm{KMAC}_{A_a}\!\left(H(d_0\|\mathsf{enc}(r_k,w,P_a,N_0));256,d_{\mathrm{adm}}\right).
 $$
 
 The RSU identifies the `(Pₐ,w)` record and rejects unknown pseudonyms or invalid `α₀` without touching the pool. When capacity is unavailable, an **authenticated BUSY** reply uses the target credential; an attacker must not be able to forge a BUSY notice that suppresses a valid offer.
@@ -178,8 +178,8 @@ After admission, the RSU chooses an unused index `j`, generates `Nᴿ`, and comp
 
 $$
 \begin{aligned}
-h_1 &= H(d_1\|\operatorname{enc}(H(\operatorname{enc}(M_0)),e,j,N_R,p_j)),\\
-\beta_1 &= \operatorname{KMAC}_{A_a}(h_1;128,d_\beta).
+h_1 &= H(d_1\|\mathsf{enc}(H(\mathsf{enc}(M_0)),e,j,N_R,p_j)),\\
+\beta_1 &= \mathrm{KMAC}_{A_a}(h_1;128,d_\beta).
 \end{aligned}
 $$
 
@@ -191,8 +191,8 @@ The vehicle sends `ct`, a fresh `Nⱽ`, and:
 
 $$
 \begin{aligned}
-\alpha_2 &= \operatorname{KMAC}_{A_a}(h_2;256,d_{\mathrm{pre}}),\\
-\tau_V &= \operatorname{KMAC}_{K_v}(h_2\|\alpha_2;256,d_{\mathrm{fv}}).
+\alpha_2 &= \mathrm{KMAC}_{A_a}(h_2;256,d_{\mathrm{pre}}),\\
+\tau_V &= \mathrm{KMAC}_{K_v}(h_2\|\alpha_2;256,d_{\mathrm{fv}}).
 \end{aligned}
 $$
 
